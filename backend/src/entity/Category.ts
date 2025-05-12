@@ -12,19 +12,19 @@ import { Subcategory } from './Subcategory.js'; // Note the .js extension
 @Entity('categories') // Explicitly naming the table 'categories'
 export class Category {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number;
 
   @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
-  name: string;
+  name!: string;
 
   // A category can have multiple subcategories
   @OneToMany(() => Subcategory, (subcategory) => subcategory.category)
-  subcategories: Subcategory[];
+  subcategories!: Subcategory[];
 
   // Optional: Keep track of when records are created/updated
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
