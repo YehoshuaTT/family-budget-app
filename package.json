@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "cliui": "^7.0.4",
+    "strip-ansi": "^6.0.1",
+    "typeorm": "^0.3.23",
+    "yargs": "^17.7.2"
+  }
+}
