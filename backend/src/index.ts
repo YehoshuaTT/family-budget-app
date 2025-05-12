@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { AppDataSource } from './data-source'; 
 import authRoutes from './routes/auth.routes'; 
+import categoryRoutes from './routes/category.routes'; // Import
+
 // Import other routes...
 
 // Load environment variables VERY EARLY
@@ -17,19 +19,18 @@ const PORT = process.env.BACKEND_PORT || 3000;
 
 // Middlewares
 app.use(cors()); // Configure CORS properly for your frontend URL in production
-app.use(express.json());
-
+app.use(express.json()); 
 // --- Database Connection ---
 AppDataSource.initialize()
-    .then(() => {
-        console.log("Data Source has been initialized!");
-
-        // --- Routes --- (Setup AFTER DB connection is successful)
-        app.use('/api/auth', authRoutes);
-        // app.use('/api/categories', categoryRoutes); // Add other routes
-        // ... etc ...
-
-        // Basic route
+.then(() => {
+    console.log("Data Source has been initialized!");
+    
+    // --- Routes --- (Setup AFTER DB connection is successful)
+    app.use('/api/categories', categoryRoutes); // Register
+    app.use('/api/auth', authRoutes);
+    // ... etc ...
+    
+    // Basic route
         app.get('/', (req: Request, res: Response) => {
             res.send('Hello from Budget App Backend!');
         });
