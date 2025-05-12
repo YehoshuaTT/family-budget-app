@@ -1,53 +1,52 @@
-import express, { Express, Request, Response } from 'express';
-import dotenv from 'dotenv';
-import 'reflect-metadata';
-import { AppDataSource } from './data-source.js'; // Ensure .js extension
+// backend/src/index.ts (Example CJS structure)
+import 'reflect-metadata'; // Must be first
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url'; // <--- ייבוא חסר קודם
-import authRoutes from './routes/auth.routes.js'; // ייבוא ה-Auth Routes
+import { AppDataSource } from './data-source'; 
+import authRoutes from './routes/auth.routes'; 
+// Import other routes...
 
+// Load environment variables VERY EARLY
+// Use __dirname (points to /app/dist usually at runtime)
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-// --- Calculate __dirname and __filename for ESM ---
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename); // This __dirname will point to .../backend/src when running source
-                                          // or .../backend/dist when running compiled code
-// --------------------------------------------------
+const app = express();
+const PORT = process.env.BACKEND_PORT || 3000;
 
-// Load .env from the project root if not running inside Docker where env_file is used
-// __dirname for compiled code (dist/index.js) is /app/dist inside container.
-// To get to project root .env, we need to go two levels up from /app/dist.
-if (process.env.NODE_ENV !== 'docker_container') { // Only load if not in docker where env_file is used
-    const envPath = path.resolve(__dirname, '../../.env'); // Correct path from dist/ to project root .env
-    console.log(`[index.ts] Attempting to load .env from: ${envPath} (relative to ${__dirname})`);
-    const dotenvResult = dotenv.config({ path: envPath });
-    if (dotenvResult.error) {
-        console.warn(`[index.ts] Warning: Could not load .env file from ${envPath}. Relying on preset environment variables. Error: ${dotenvResult.error.message}`);
-    } else {
-        console.log(`[index.ts] .env file loaded from ${envPath}.`);
-    }
-}
-
-const app: Express = express();
-const PORT = process.env.BACKEND_PORT || 3001;
-
-app.use(cors());
+// Middlewares
+app.use(cors()); // Configure CORS properly for your frontend URL in production
 app.use(express.json());
-app.use('/api/auth', authRoutes); // הוספת ה-Auth Routes
 
-app.get('/api/test', (req: Request, res: Response) => {
-  res.json({ message: 'Test route is working!' });
-});
-
-app.get('/', (req: Request, res: Response) => {
-    res.send('Family Budget Backend (TypeScript) is running!');
-});
-
+// --- Database Connection ---
 AppDataSource.initialize()
-    .then(async () => {
-        console.log("[index.ts] Data Source has been initialized for the server!");
-        app.listen(PORT, () => {
-            console.log(`[index.ts] Server is running on port ${PORT}`);
+    .then(() => {
+        console.log("Data Source has been initialized!");
+
+        // --- Routes --- (Setup AFTER DB connection is successful)
+        app.use('/api/auth', authRoutes);
+        // app.use('/api/categories', categoryRoutes); // Add other routes
+        // ... etc ...
+
+        // Basic route
+        app.get('/', (req: Request, res: Response) => {
+            res.send('Hello from Budget App Backend!');
         });
+
+        // Global error handler (example)
+        app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+            console.error("Global Error Handler:", err.stack);
+            res.status(500).send('Something broke!');
+        });
+
+        // Start listening
+        app.listen(PORT, () => {
+            console.log(`Backend server running at http://localhost:${PORT}`);
+        });
+
     })
-    .catch((error: any) => console.log("[index.ts] Error during Data Source initialization or server start:", error));
+    .catch((err) => {
+        console.error("Error during Data Source initialization:", err);
+        process.exit(1); // Exit if DB connection fails
+    });

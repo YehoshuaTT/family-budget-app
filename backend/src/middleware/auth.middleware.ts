@@ -1,8 +1,8 @@
 // backend/src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AppDataSource } from '../data-source.js'; // ייבוא ה-DataSource
-import { User } from '../entity/User.js';     // ייבוא מודל User
+import { AppDataSource } from '../data-source'; // ייבוא ה-DataSource
+import { User } from '../entity/User';     // ייבוא מודל User
 
 // הרחבת ממשק Request של Express כדי שיכיל את המשתמש
 export interface AuthRequest extends Request {

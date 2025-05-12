@@ -1,7 +1,7 @@
 // backend/src/routes/auth.routes.ts
 import { Router, Request, Response } from 'express';
-import { AppDataSource } from '../data-source.js';
-import { User } from '../entity/User.js';
+import { AppDataSource } from '../data-source';
+import { User } from '../entity/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';

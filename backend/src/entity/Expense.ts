@@ -7,20 +7,21 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
+  DeleteDateColumn ,
 } from 'typeorm';
-import { User } from './User.js';
-import { Subcategory } from './Subcategory.js';
+import { User } from './User'; // Static import
+import { Subcategory } from './Subcategory'; // Static import
 
 @Entity('expenses')
 export class Expense {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
-  amount: number;
+  amount!: number;
 
   @Column({ type: 'date', nullable: false })
-  date: string; // Or Date object
+  date!: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
@@ -28,31 +29,36 @@ export class Expense {
   @Column({ type: 'varchar', length: 50, nullable: true })
   paymentMethod?: string;
 
-  // Relationship: Many Expenses belong to one User
-  @ManyToOne(() => User, (user) => user.expenses, {
-    nullable: false,
-    onDelete: 'CASCADE', // If user deleted, delete their expenses
-  })
+  // Relationship using String Name
+  @ManyToOne(
+    'User', // Use string name
+    (user: User) => user.expenses, // Keep arrow function for inverse side, add type
+    { nullable: false, onDelete: 'CASCADE' }
+  )
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User; // Type remains the same
 
   @Column({ type: 'int', nullable: false })
-  userId: number;
+  userId!: number;
 
-  // Relationship: Many Expenses belong to one Subcategory
-  @ManyToOne(() => Subcategory, (subcategory) => subcategory.expenses, {
-    nullable: false, // An expense must have a subcategory (change if needed)
-    onDelete: 'RESTRICT', // Prevent deleting a subcategory if expenses are linked. Consider 'SET NULL' if you add an 'Uncategorized' option.
-  })
+  // Relationship using String Name
+  @ManyToOne(
+    'Subcategory', // Use string name
+    (subcategory: Subcategory) => subcategory.expenses, // Keep arrow function for inverse side, add type
+    { nullable: false, onDelete: 'RESTRICT' }
+  )
   @JoinColumn({ name: 'subcategoryId' })
-  subcategory: Subcategory;
+  subcategory!: Subcategory; // Type remains the same
 
   @Column({ type: 'int', nullable: false })
-  subcategoryId: number;
+  subcategoryId!: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

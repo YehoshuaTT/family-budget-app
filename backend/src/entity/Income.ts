@@ -7,42 +7,46 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
+  DeleteDateColumn,
+
 } from 'typeorm';
-import { User } from './User.js';
+import { User } from './User'; // Static import
 
 @Entity('incomes')
 export class Income {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number;
 
-  // Using 'decimal' for financial values is recommended over float/double
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
-  amount: number;
+  amount!: number;
 
-  @Column({ type: 'date', nullable: false }) // Store only the date part
-  date: string; // TypeORM maps JS Date objects correctly, storing as string is also viable
+  @Column({ type: 'date', nullable: false })
+  date!: string;
 
-  // Optional fields marked with '?' in TS and nullable: true in TypeORM
   @Column({ type: 'varchar', length: 100, nullable: true })
   source?: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  // Relationship: Many Incomes belong to one User
-  @ManyToOne(() => User, (user) => user.incomes, {
-    nullable: false, // An income must belong to a user
-    onDelete: 'CASCADE', // If a user is deleted, delete their incomes
-  })
+  // Relationship using String Name
+  @ManyToOne(
+    'User', // Use string name
+    (user: User) => user.incomes, // Keep arrow function for inverse side, add type
+    { nullable: false, onDelete: 'CASCADE' }
+  )
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User; // Type remains the same
 
   @Column({ type: 'int', nullable: false })
-  userId: number;
+  userId!: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
+
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

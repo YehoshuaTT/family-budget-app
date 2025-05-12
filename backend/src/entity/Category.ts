@@ -1,27 +1,30 @@
 // backend/src/entity/Category.ts
 import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
+  Entity,  PrimaryGeneratedColumn, Column,
+  OneToMany, CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
-import { Subcategory } from './Subcategory.js'; // Note the .js extension
+import { Subcategory } from './Subcategory'; // CJS: No .js
 
-@Entity('categories') // Explicitly naming the table 'categories'
+@Entity('categories')
 export class Category {
   @PrimaryGeneratedColumn('increment')
   id!: number;
 
-  @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
+  @Column({ type: 'varchar', length: 100, nullable: false })
   name!: string;
+  
+  @Column({ type: 'varchar', length: 20, default: 'expense', nullable: false}) // 'expense' or 'income'
+  type!: string;
+  
+  @Column({ type: 'boolean', default: false, nullable: false})
+  archived!: boolean; // <-- ADDED
 
-  // A category can have multiple subcategories
-  @OneToMany(() => Subcategory, (subcategory) => subcategory.category)
+  @OneToMany(
+    () => Subcategory,
+    (subcategory: Subcategory) => subcategory.category
+  )
   subcategories!: Subcategory[];
 
-  // Optional: Keep track of when records are created/updated
   @CreateDateColumn()
   createdAt!: Date;
 

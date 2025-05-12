@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "module": "node16", // <--- שינוי כאן! (או "nodenext")
+    "module": "CommonJS", // <--- שינוי כאן! (או "nodenext")
     "esModuleInterop": true,
     "target": "es2020", // אפשר להשאיר es2017 או לשדרג ל-es2020 ומעלה
-    "moduleResolution": "nodenext", // <--- שנה גם את זה ל-"nodenext" או "node16"
+    "moduleResolution": "Node", // <--- שנה גם את זה ל-"nodenext" או "node16"
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",

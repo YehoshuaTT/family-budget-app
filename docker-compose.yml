@@ -13,7 +13,8 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     env_file:
       - .env
-
+    networks:
+      - budget_network
   backend:
     build: ./backend
     ports:
@@ -29,7 +30,8 @@ services:
     env_file:
       - .env
     command: sh -c "npm install && npm run build && npm run migrate && npm run seed && npm run dev"
-
+    networks:
+      - budget_network
   frontend:
     build: ./frontend
     ports:
@@ -43,6 +45,22 @@ services:
     env_file:
       - .env
     command: sh -c "npm install && npm run dev"
+    networks:
+      - budget_network
 
+  adminer:
+    image: adminer # משתמש באימג' הרשמי של Adminer
+    container_name: budget_adminer # שם לקונטיינר (אופציונלי)
+    restart: always
+    ports:
+      - "8080:8080" # מאפשר גישה מהדפדפן המקומי ב-localhost:8080
+    depends_on: # אופציונלי, אבל מומלץ לחכות ל-DB
+      - db
+    networks: # חייב להיות באותה רשת כמו ה-DB
+      - budget_network
+
+networks:
+  budget_network:
+    driver: bridge
 volumes:
   db_data:

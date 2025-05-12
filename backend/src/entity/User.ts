@@ -1,52 +1,55 @@
-// backend/src/entity/User.ts
+// backend/src/entity/User.ts (Correct Standard Pattern)
 import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany, // Import OneToMany
+  OneToMany,
   OneToOne, // Import OneToOne
+  DeleteDateColumn // <-- ADDED
 } from 'typeorm';
-import { Income } from './Income.js'; // Import Income
-import { Expense } from './Expense.js'; // Import Expense
-import { UserSettings } from './UserSettings.js'; // Import UserSettings
+import { Income } from './Income';
+import { Expense } from './Expense';
+import { UserSettings } from './UserSettings'; // Import UserSettings
 
-@Entity('users') // Ensure table name is specified
+@Entity('users')
 export class User {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number; // Property 'id'
 
   @Column({ type: 'varchar', length: 255, unique: true, nullable: false })
-  email: string;
+  email!: string; // Property 'email'
 
-  // Good practice: don't select password by default
   @Column({ type: 'varchar', length: 255, nullable: false, select: false })
-  password: string;
+  password!: string; // Property 'password'
 
-  // Optional name from signup
   @Column({ type: 'varchar', length: 100, nullable: true })
-  name?: string;
+  name?: string; // Property 'name'
 
-  // --- New Relationships ---
+  // --- OneToMany Relations (Keep using string names for now) ---
+  @OneToMany('Income', (income: Income) => income.user)
+  incomes!: Income[];
 
-  // Relationship: One User has many Incomes
-  @OneToMany(() => Income, (income) => income.user)
-  incomes: Income[];
+  @OneToMany('Expense', (expense: Expense) => expense.user)
+  expenses!: Expense[];
 
-  // Relationship: One User has many Expenses
-  @OneToMany(() => Expense, (expense) => expense.user)
-  expenses: Expense[];
-
-  // Relationship: One User has one UserSettings
-  // cascade: true can help automatically save/update settings when saving the user
-  @OneToOne(() => UserSettings, (settings) => settings.user, { cascade: true })
-  settings: UserSettings;
+  // --- OneToOne Relation (Inverse Side) ---
+  @OneToOne(
+    () => UserSettings, // Use arrow function pointing to imported UserSettings class
+    (settings: UserSettings) => settings.user, // Point back to the 'user' property on UserSettings
+    { cascade: true }
+  )
+  // NO @JoinColumn decorator on the inverse side
+  settings!: UserSettings; // Property 'settings'
 
   // --- Timestamps ---
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
+  
+  @DeleteDateColumn() // <-- ADDED
+  deletedAt?: Date;   // Can be nullable
 }

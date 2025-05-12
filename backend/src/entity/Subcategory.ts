@@ -1,44 +1,42 @@
 // backend/src/entity/Subcategory.ts
 import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
-  JoinColumn, // Import JoinColumn
+  Entity, PrimaryGeneratedColumn, Column, ManyToOne,
+  OneToMany, CreateDateColumn, UpdateDateColumn, JoinColumn,
 } from 'typeorm';
-import { Category } from './Category.js';
-import { Expense } from './Expense.js'; // We'll define Expense next
+import { Category } from './Category'; // CJS: No .js
+import { Expense } from './Expense';   // CJS: No .js
 
 @Entity('subcategories')
 export class Subcategory {
   @PrimaryGeneratedColumn('increment')
-  id: number;
+  id!: number;
 
   @Column({ type: 'varchar', length: 100, nullable: false })
-  name: string;
+  name!: string;
+  
+  @Column({ type: 'boolean', default: false, nullable: false})
+   archived!: boolean; // <-- ADDED
 
-  // Relationship: Many Subcategories belong to one Category
-  @ManyToOne(() => Category, (category) => category.subcategories, {
-    nullable: false, // A subcategory must belong to a category
-    onDelete: 'CASCADE', // If a category is deleted, delete its subcategories
-  })
-  @JoinColumn({ name: 'categoryId' }) // Explicit foreign key column name
-  category: Category;
-
-  // Explicitly define the foreign key column (optional but good practice)
   @Column({ type: 'int', nullable: false })
-  categoryId: number;
+  categoryId!: number; // FK Column
 
-  // Relationship: One Subcategory can have many Expenses
-  @OneToMany(() => Expense, (expense) => expense.subcategory)
-  expenses: Expense[];
+  @ManyToOne(
+    () => Category,
+    (category: Category) => category.subcategories,
+     { nullable: false, onDelete: 'CASCADE' }
+   )
+  @JoinColumn({ name: 'categoryId' }) // Owning side
+  category!: Category;
+
+  @OneToMany(
+     () => Expense,
+     (expense: Expense) => expense.subcategory
+  )
+  expenses!: Expense[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
