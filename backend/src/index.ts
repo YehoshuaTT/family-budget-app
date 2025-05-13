@@ -7,6 +7,8 @@ import path from 'path';
 import { AppDataSource } from './data-source'; 
 import authRoutes from './routes/auth.routes'; 
 import categoryRoutes from './routes/category.routes'; // Import
+import incomeRoutes from './routes/income.routes'; // <<< ADD THIS IMPORT
+import expenseRoutes from './routes/expense.routes'; // Import
 
 // Import other routes...
 
@@ -28,6 +30,9 @@ AppDataSource.initialize()
     // --- Routes --- (Setup AFTER DB connection is successful)
     app.use('/api/categories', categoryRoutes); // Register
     app.use('/api/auth', authRoutes);
+    app.use('/api/incomes', incomeRoutes); // <<< ADD THIS LINE
+    app.use('/api/expenses', expenseRoutes); // Register
+
     // ... etc ...
     
     // Basic route

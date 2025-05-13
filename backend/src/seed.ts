@@ -1,47 +1,53 @@
 // backend/src/seed.ts
-import 'reflect-metadata'; // Keep this if needed, though often not strictly required for seeders unless using complex decorators within the seeder itself
-import { AppDataSource } from './data-source'; // CJS: No .js
-import { Category } from './entity/Category';     // CJS: No .js
-import { Subcategory } from './entity/Subcategory'; // CJS: No .js
-import { In } from 'typeorm';                      // Import 'In' operator
+import 'reflect-metadata';
+import { AppDataSource } from './data-source';
+import { Category } from './entity/Category';
+import { Subcategory } from './entity/Subcategory';
+import { In } from 'typeorm';
+
+interface SubcategorySeedData {
+  name: string;
+  // Add any other subcategory specific seed properties here if needed in future
+}
 
 interface CategorySeedData {
   name: string;
-  type?: 'expense' | 'income'; // Optional type, defaults to 'expense'
-  subcategories: string[];
+  type: 'expense' | 'income'; // Explicitly define type
+  subcategories?: SubcategorySeedData[] | string[]; // Can be array of objects or strings
 }
 
 // =================================================================
 // DEFINE CATEGORIES DATA
-// (Using the structure you provided)
 // =================================================================
 const categoriesData: CategorySeedData[] = [
-  { name: "מזון ופארמה", subcategories: [ "מזון ופארמה - כללי", "בר מים", "אוכל מוכן / בעבודה", "פארמה וטואלטיקה", "מזון", "עישון" ]},
-  { name: "פנאי, בילוי ותחביבים", subcategories: [ "בייביסיטר", "פנאי - כללי", "חוגי מבוגרים", "מסעדה ואוכל בחוץ", "חיות מחמד", "הגרלות", "ספורט", "חופשות", "בילויים ומופעים" ]},
-  { name: "ביגוד והנעלה", subcategories: [ "ביגוד הורים", "ביגוד ילדים", "נעליים", "ביגוד והנעלה - כללי" ]},
-  { name: "תכולת בית", subcategories: [ "ריהוט", "מוצרי חשמל ואלקטרוניקה", "משחקים, צעצועים וספרים", "כלי בית", "תכולת בית - כללי" ]},
-  { name: "אחזקת בית", subcategories: [ "גינה", "מים וביוב", "חשמל", "גז", "אחזקת בית - כללי", "תיקונים בבית / במכשירים", "ניקיון" ]},
-  { name: "טיפוח", subcategories: [ "קוסמטיקה", "טיפוח - כללי", "מספרה" ]},
-  { name: "חינוך", subcategories: [ "מסגרות יום", "מסגרות צהריים", "הסעות", "בית ספר", "מסגרות קיץ", "צהרון / מטפלת", "שיעור פרטי", "לימודים והשתלמות לבוגרים", "חינוך - כללי", "חוגים ותנועת נוער" ]},
-  { name: "אירועים, תרומות, צרכי דת", subcategories: [ "אירוע בעבודה / לחברים", "תרומות", "חגים וצורכי דת" ]},
-  { name: "בריאות", subcategories: [ "תשלום לקופ\"ח", "טיפולים פרטיים", "ביטוח רפואי נוסף", "תרופות", "בריאות - כללי", "טיפולי שיניים / אורתודנט", "אופטיקה" ]},
-  { name: "תחבורה", subcategories: [ "ליסינג", "תחבורה שיתופית", "רישוי רכב", "חניה", "תחבורה - כללי", "כבישי אגרה", "ביטוח רכב", "תחזוקת רכב", "תחבורה ציבורית", "דלק" ]},
-  { name: "משפחה", subcategories: [ "תשלום מזונות", "עזרה למשפחה", "משפחה - כללי", "חיסכון לבר מצווה אור דוד ועדי ישראל", "דמי כיס", "אירועי שמחות במשפחה" ]},
-  { name: "תקשורת", subcategories: [ "שירותי תוכן", "טלוויזיה ואינטרנט (ספק ותשתית)", "תקשורת - כללי", "טלפון נייד ונייח" ]},
-  { name: "דיור", subcategories: [ "דיור - כללי", "ביטוח נכס ותכולה", "משכנתה", "שכר דירה", "מיסי יישוב / ועד בית", "ארנונה" ]},
-  { name: "התחייבויות", subcategories: [ "החזר חובות חודשי (למעט משכנתה) - כללי", "ריביות משיכת יתר" ]},
-  { name: "נכסים", subcategories: [ "הפקדות לחסכונות - כללי" ]}, // Consider if this should be 'expense' or a different type
-  { name: "פיננסים", subcategories: [ "עמלות", "ביטוח חיים", "פיננסים - כללי", "ביטוח לאומי (למי שלא עובד)" ]},
-  // --- Income Categories Example (uncomment and adjust if needed) ---
-  // { name: "הכנסות שוטפות", type: "income", subcategories: ["משכורת", "עסק", "קצבאות", "הכנסה אחרת"]},
-  // { name: "הכנסות הוניות", type: "income", subcategories: ["מתנות", "ירושות", "מכירת נכסים", "הכנסה הונית אחרת"]},
+  // --- Expense Categories (as before) ---
+  { name: "מזון ופארמה", type: "expense", subcategories: [ "מזון ופארמה - כללי", "בר מים", "אוכל מוכן / בעבודה", "פארמה וטואלטיקה", "מזון", "עישון" ]},
+  { name: "פנאי, בילוי ותחביבים", type: "expense", subcategories: [ "בייביסיטר", "פנאי - כללי", "חוגי מבוגרים", "מסעדה ואוכל בחוץ", "חיות מחמד", "הגרלות", "ספורט", "חופשות", "בילויים ומופעים" ]},
+  { name: "ביגוד והנעלה", type: "expense", subcategories: [ "ביגוד הורים", "ביגוד ילדים", "נעליים", "ביגוד והנעלה - כללי" ]},
+  { name: "תכולת בית", type: "expense", subcategories: [ "ריהוט", "מוצרי חשמל ואלקטרוניקה", "משחקים, צעצועים וספרים", "כלי בית", "תכולת בית - כללי" ]},
+  { name: "אחזקת בית", type: "expense", subcategories: [ "גינה", "מים וביוב", "חשמל", "גז", "אחזקת בית - כללי", "תיקונים בבית / במכשירים", "ניקיון" ]},
+  { name: "טיפוח", type: "expense", subcategories: [ "קוסמטיקה", "טיפוח - כללי", "מספרה" ]},
+  { name: "חינוך", type: "expense", subcategories: [ "מסגרות יום", "מסגרות צהריים", "הסעות", "בית ספר", "מסגרות קיץ", "צהרון / מטפלת", "שיעור פרטי", "לימודים והשתלמות לבוגרים", "חינוך - כללי", "חוגים ותנועת נוער" ]},
+  { name: "אירועים, תרומות, צרכי דת", type: "expense", subcategories: [ "אירוע בעבודה / לחברים", "תרומות", "חגים וצורכי דת" ]},
+  { name: "בריאות", type: "expense", subcategories: [ "תשלום לקופ\"ח", "טיפולים פרטיים", "ביטוח רפואי נוסף", "תרופות", "בריאות - כללי", "טיפולי שיניים / אורתודנט", "אופטיקה" ]},
+  { name: "תחבורה", type: "expense", subcategories: [ "ליסינג", "תחבורה שיתופית", "רישוי רכב", "חניה", "תחבורה - כללי", "כבישי אגרה", "ביטוח רכב", "תחזוקת רכב", "תחבורה ציבורית", "דלק" ]},
+  { name: "משפחה", type: "expense", subcategories: [ "תשלום מזונות", "עזרה למשפחה", "משפחה - כללי", "חיסכון לבר מצווה אור דוד ועדי ישראל", "דמי כיס", "אירועי שמחות במשפחה" ]},
+  { name: "תקשורת", type: "expense", subcategories: [ "שירותי תוכן", "טלוויזיה ואינטרנט (ספק ותשתית)", "תקשורת - כללי", "טלפון נייד ונייח" ]},
+  { name: "דיור", type: "expense", subcategories: [ "דיור - כללי", "ביטוח נכס ותכולה", "משכנתה", "שכר דירה", "מיסי יישוב / ועד בית", "ארנונה" ]},
+  { name: "התחייבויות", type: "expense", subcategories: [ "החזר חובות חודשי (למעט משכנתה) - כללי", "ריביות משיכת יתר" ]},
+  { name: "נכסים", type: "expense", subcategories: [ "הפקדות לחסכונות - כללי" ]}, // Still 'expense' as per previous structure; consider if this is correct. Often savings are transfers, not expenses.
+  { name: "פיננסים", type: "expense", subcategories: [ "עמלות", "ביטוח חיים", "פיננסים - כללי", "ביטוח לאומי (למי שלא עובד)" ]},
+
+  // --- Income Categories (NEW) ---
+  { name: "שכר עבודה", type: "income", subcategories: [ "שכר עבודה - כללי", "שכר עבודה 1", "שכר עבודה 2" ] }, // "שכר עבודה - כללי" for simpler cases
+  { name: "קצבאות וגמלאות", type: "income", subcategories: [ "קצבת ילדים", "קצבת נכות", "דמי אבטלה", "פנסיה/גמלה", "קצבאות אחרות - כללי" ] },
+  { name: "הכנסות מנכסים והשקעות", type: "income", subcategories: [ "שכר דירה (מהשכרת נכס)", "דיבידנדים", "רווחי הון", "הכנסה פיננסית אחרת - כללי" ] },
+  { name: "עסק עצמאי / פרילנס", type: "income", subcategories: [ "עסק עצמאי - כללי" ] }, // User can create more specific ones later if needed
+  { name: "סיוע ותמיכות", type: "income", subcategories: [ "סיוע בשכר דירה", "עזרה ממשפחה", "קבלת מזונות" ] },
+  { name: "הכנסות שונות", type: "income", subcategories: [ "מתנות (כסף)", "החזרים", "מכירת חפצים", "הכנסות שונות - כללי" ] },
 ];
 // =================================================================
 
-/**
- * Seeds the database with default categories and subcategories.
- * Checks for existence before creating to allow safe re-running.
- */
 const seedDatabase = async () => {
   try {
     console.log('SEED: Attempting to initialize Data Source...');
@@ -56,90 +62,85 @@ const seedDatabase = async () => {
     console.log(`\nSEED: Processing ${categoriesData.length} primary categories...`);
 
     for (const catData of categoriesData) {
-       const categoryType = catData.type || 'expense'; // Default to 'expense'
-
       // 1. Find or Create Category
-      // Check if a category with this name ALREADY exists
-       let category = await categoryRepository.findOneBy({ name: catData.name });
+      let category = await categoryRepository.findOneBy({ name: catData.name, type: catData.type });
 
-       if (!category) {
-         console.log(` -> Creating Category: "${catData.name}" (Type: ${categoryType})`);
-         category = categoryRepository.create({
+      if (!category) {
+        console.log(` -> Creating Category: "${catData.name}" (Type: ${catData.type})`);
+        category = categoryRepository.create({
           name: catData.name,
-          type: categoryType,
-          archived: false, // New categories are not archived
-         });
-         await categoryRepository.save(category);
-         categoriesCreated++;
-       } else {
-         console.log(` -> Category "${catData.name}" already exists (ID: ${category.id}). Checking subcategories...`);
-         // Optional: Update type or other fields if needed for existing categories
-         // if (category.type !== categoryType) {
-         //   category.type = categoryType;
-         //   await categoryRepository.save(category);
-         //   console.log(`    Updated type for "${category.name}" to ${categoryType}`);
-         // }
-       }
+          type: catData.type,
+          archived: false,
+        });
+        await categoryRepository.save(category);
+        categoriesCreated++;
+      } else {
+        console.log(` -> Category "${catData.name}" (Type: ${catData.type}) already exists (ID: ${category.id}). Checking subcategories...`);
+      }
 
-      // 2. Find or Create Subcategories for this Category
-      if (category && catData.subcategories?.length > 0) {
-        // Find existing subcategories for this category ID and names provided
-         const existingSubcategories = await subcategoryRepository.find({
-           where: {
-             categoryId: category.id,
-             name: In(catData.subcategories) // Check only for names in the current seed list
-           },
-           select: ["name"] // Only need the names for comparison
-         });
-         const existingSubNames = existingSubcategories.map(sub => sub.name);
-         console.log(`    Found ${existingSubNames.length} existing subcategories for "${category.name}": [${existingSubNames.join(', ')}]`);
+      // 2. Find or Create Subcategories for this Category (Only if it's an 'expense' type for now, or adjust as needed)
+      if (category && catData.type === 'expense' && catData.subcategories && catData.subcategories.length > 0) {
+        const subNames = catData.subcategories.map(sub => (typeof sub === 'string' ? sub : sub.name));
 
-         const subcategoriesToCreate: Partial<Subcategory>[] = [];
+        const existingSubcategories = await subcategoryRepository.find({
+          where: {
+            categoryId: category.id,
+            name: In(subNames)
+          },
+          select: ["name"]
+        });
+        const existingSubNames = existingSubcategories.map(sub => sub.name);
+        console.log(`    Found ${existingSubNames.length} existing subcategories for expense category "${category.name}": [${existingSubNames.join(', ')}]`);
 
-         for (const subName of catData.subcategories) {
-           // If this subName is NOT among the existing ones for this category
-           if (!existingSubNames.includes(subName)) {
-               subcategoriesToCreate.push({
-                 name: subName,
-                 category: category, // Link to the parent Category object for the relation
-                 archived: false,    // New subcategories are not archived
-               });
-             console.log(`    -> Queued new Subcategory: "${subName}"`);
-           }
-         }
+        const subcategoriesToCreate: Partial<Subcategory>[] = [];
 
-         // Bulk-create all the new subcategories needed for this category
-         if (subcategoriesToCreate.length > 0) {
-             console.log(`    => Attempting to save ${subcategoriesToCreate.length} new subcategories...`);
-             const newSubEntities = subcategoryRepository.create(subcategoriesToCreate);
-             await subcategoryRepository.save(newSubEntities);
-             subcategoriesCreated += subcategoriesToCreate.length;
-             console.log(`    ==> Saved ${subcategoriesToCreate.length} new subcategories for "${category.name}".`);
-         } else {
-             console.log(`    -> No new subcategories needed for "${category.name}".`);
-         }
-       }
-       console.log(` --- Finished processing category "${catData.name}" ---`);
+        for (const subItem of catData.subcategories) {
+          const subName = typeof subItem === 'string' ? subItem : subItem.name;
+          if (!existingSubNames.includes(subName)) {
+            subcategoriesToCreate.push({
+              name: subName,
+              category: category,
+              archived: false,
+            });
+            console.log(`    -> Queued new Subcategory: "${subName}"`);
+          }
+        }
+
+        if (subcategoriesToCreate.length > 0) {
+          console.log(`    => Attempting to save ${subcategoriesToCreate.length} new subcategories for "${category.name}"...`);
+          const newSubEntities = subcategoryRepository.create(subcategoriesToCreate);
+          await subcategoryRepository.save(newSubEntities);
+          subcategoriesCreated += subcategoriesToCreate.length;
+          console.log(`    ==> Saved ${subcategoriesToCreate.length} new subcategories for "${category.name}".`);
+        } else {
+          console.log(`    -> No new subcategories needed for "${category.name}".`);
+        }
+      } else if (catData.type === 'income') {
+        // For income categories, we currently don't have a separate Subcategory entity.
+        // The Category itself serves as the classification.
+        // If you decide to add subcategories for income later, this logic would need expansion.
+        console.log(`    -> Category "${catData.name}" is of type 'income'. No subcategories to process from seed data.`);
+      }
+      console.log(` --- Finished processing category "${catData.name}" ---`);
     } // end category loop
 
     console.log('\n==========================================');
     console.log('SEED Summary:');
     console.log(` - Categories Created: ${categoriesCreated}`);
-    console.log(` - Subcategories Created: ${subcategoriesCreated}`);
+    console.log(` - Subcategories Created: ${subcategoriesCreated}`); // Will be 0 if only income categories were new
     if (categoriesCreated === 0 && subcategoriesCreated === 0) {
-      console.log('   (No changes needed, database was already seeded)');
+      console.log('   (No changes needed, database was already seeded or no new expense categories with subs)');
     }
     console.log('==========================================');
     console.log('SEED: Seeding process completed.');
 
   } catch (error) {
     console.error('SEED: Error during database seeding:', error);
-    process.exit(1); // Exit with error code
+    process.exit(1);
   } finally {
-    // Ensure the connection is closed even if errors occurred (or if successful)
     if (AppDataSource.isInitialized) {
-       await AppDataSource.destroy();
-       console.log('SEED: Data Source connection closed.');
+      await AppDataSource.destroy();
+      console.log('SEED: Data Source connection closed.');
     }
   }
 };

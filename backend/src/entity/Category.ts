@@ -1,33 +1,39 @@
 // backend/src/entity/Category.ts
 import {
-  Entity,  PrimaryGeneratedColumn, Column,
-  OneToMany, CreateDateColumn, UpdateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
-import { Subcategory } from './Subcategory'; // CJS: No .js
+import { Subcategory } from './Subcategory';
+import { Income } from './Income';
 
 @Entity('categories')
 export class Category {
   @PrimaryGeneratedColumn('increment')
   id!: number;
 
-  @Column({ type: 'varchar', length: 100, nullable: false })
+  @Column({ type: 'varchar', length: 100, nullable: false }) // Consider adding unique:true if names must be unique per type
   name!: string;
-  
-  @Column({ type: 'varchar', length: 20, default: 'expense', nullable: false}) // 'expense' or 'income'
-  type!: string;
-  
-  @Column({ type: 'boolean', default: false, nullable: false})
-  archived!: boolean; // <-- ADDED
 
-  @OneToMany(
-    () => Subcategory,
-    (subcategory: Subcategory) => subcategory.category
-  )
-  subcategories!: Subcategory[];
+  @Column({ type: 'varchar', length: 20, default: 'expense', nullable: false })
+  type!: 'expense' | 'income';
+
+  @Column({ type: 'boolean', default: false, nullable: false })
+  archived!: boolean;
 
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  // --- Relationships ---
+  @OneToMany(() => Subcategory, (subcategory) => subcategory.category)
+  subcategories!: Subcategory[];
+
+  @OneToMany(() => Income, (income) => income.category)
+  incomes!: Income[];
 }
