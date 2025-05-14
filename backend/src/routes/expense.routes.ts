@@ -9,35 +9,9 @@ import { RecurringExpenseDefinition, Frequency } from '../entity/RecurringExpens
 import { InstallmentTransaction } from '../entity/InstallmentTransaction';
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { addMonths, format, parseISO, isValid as isValidDate } from 'date-fns';
+import { buildExpenseResponse  } from '../utils/responseBuilders';
 
 const router = Router();
-
-// --- Helper function to build standardized expense response object ---
-const buildExpenseResponse = (expense: Expense | null) => {
-  if (!expense) return null;
-  return {
-    id: expense.id,
-    amount: parseFloat(expense.amount as any),
-    date: expense.date,
-    description: expense.description,
-    paymentMethod: expense.paymentMethod,
-    expenseType: expense.expenseType,
-    parentId: expense.parentId,
-    isProcessed: expense.isProcessed,
-    subcategory: expense.subcategory ? {
-        id: expense.subcategory.id,
-        name: expense.subcategory.name,
-        category: expense.subcategory.category ? {
-            id: expense.subcategory.category.id,
-            name: expense.subcategory.category.name,
-            type: expense.subcategory.category.type,
-        } : null
-    } : null,
-    createdAt: expense.createdAt,
-    updatedAt: expense.updatedAt,
-    deletedAt: expense.deletedAt
-  };
-};
 
 // --- Validation Rules ---
 // Base rules applicable to all or most types. Specifics handled in custom validator or downstream.

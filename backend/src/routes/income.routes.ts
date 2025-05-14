@@ -7,27 +7,9 @@ import { User } from '../entity/User'; // Needed if you associate User object di
 import { Category } from '../entity/Category'; // For associating income category
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { format, parseISO } from 'date-fns';
+import { buildIncomeResponse } from '../utils/responseBuilders';
 
 const router = Router();
-
-// --- Helper function to build standardized income response object ---
-const buildIncomeResponse = (income: Income | null) => {
-  if (!income) return null;
-  return {
-    id: income.id,
-    amount: parseFloat(income.amount as any), // Ensure amount is number
-    date: income.date,
-    description: income.description,
-    category: income.category ? { // Include category details if available
-        id: income.category.id,
-        name: income.category.name,
-        type: income.category.type
-    } : null,
-    createdAt: income.createdAt,
-    updatedAt: income.updatedAt,
-    deletedAt: income.deletedAt
-  };
-};
 
 // --- Validation Rules for Create/Update Income ---
 const incomeValidationRules = [
