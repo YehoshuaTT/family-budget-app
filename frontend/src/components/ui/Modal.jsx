@@ -51,17 +51,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
         </div>
       </div>
       {/* אנימציה למודל ב-CSS (אפשר להוסיף ל-index.css או tailwind.config.js) */}
-      <style jsx global>{`
-        @keyframes modalShow {
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-modalShow {
-          animation: modalShow 0.3s forwards;
-        }
-      `}</style>
+     
     </div>
   );
 };

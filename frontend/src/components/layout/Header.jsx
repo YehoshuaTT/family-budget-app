@@ -1,6 +1,6 @@
 // src/components/layout/Header.jsx
 import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext'; // <--- הוסף ייבוא זה
 import { FiLogOut, FiUser, FiMenu } from 'react-icons/fi';
 
 // הפונקציה הזו תהיה זמינה אם תרצה להוסיף כפתור לפתיחת/סגירת הסיידבר במובייל
@@ -16,11 +16,10 @@ const MobileMenuButton = ({ onOpenMobileMenu }) => (
 );
 
 
-const Header = ({ onOpenMobileMenu }) => { // onOpenMobileMenu הוא prop אופציונלי
-  const { user, logout } = useAuth();
-
+const Header = ({ onOpenMobileMenu }) => {
+  const { user, logout } = useAuth(); // <--- קבל את user ו-logout מה-Context
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-40 rtl"> {/* z-40 to be under sidebar if it overlaps */}
+    <header className="bg-white shadow-sm sticky top-0 z-30 rtl"> {/* z-30 כדי להיות מתחת למודלים */}
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 md:ml-64"> {/* md:ml-64 for when sidebar is fixed */}
         <div className="flex items-center justify-between h-16">
           {/* Left side of header (e.g., search or page title - usually dynamic) */}
