@@ -8,6 +8,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout'; // יבא את ה-Layout
 import { useAuth } from './contexts/AuthContext';
 import TransactionsListPage from './pages/TransactionsListPage'; // ניצור בהמשך
+import UserSettingsPage from './pages/UserSettingsPage'; // יבא את העמוד החדש
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +29,7 @@ function App() {
       {/* Protected Routes use MainLayout */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}> {/* עוטף את כל הדפים המוגנים ב-MainLayout */}
+          <Route path="/settings" element={<UserSettingsPage />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} /> {/* הפניה מהשורש לדשבורד */}
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/transactions" element={<TransactionsListPage />} /> {/* דף חדש */}
