@@ -21,16 +21,18 @@ services:
     ports:
       - "${BACKEND_PORT}:3001"
     volumes:
-      - ./backend:/app
+      - ./backend:/app        # מאפשר hot-reloading של הקוד שלך
+      - /app/node_modules   # "Volume אנונימי" - מונע מה-node_modules המקומי שלך לדרוס את זה שבתוך האימג'
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DB_PORT}/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
-      DB_HOST: ${DB_HOST}
+      DB_HOST: ${DB_HOST} # עדיין חשוב, כי data-source.ts משתמש בו
+      # CHOKIDAR_USEPOLLING: "true" # לפעמים עוזר ל-nodemon/tsc -w לזהות שינויים טוב יותר בתוך Docker
     depends_on:
       - db
     env_file:
       - .env
-    command: sh -c "npm install && npm run build && npm run migrate && npm run seed && npm run dev"
+    command: npm run dev # <-- השינוי המרכזי! מריץ רק את סקריפט הפיתוח
     networks:
       - budget_network
   frontend:

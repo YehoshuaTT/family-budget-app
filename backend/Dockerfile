@@ -1,16 +1,16 @@
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --frozen-lockfile
-COPY . .
-RUN npm run build
+# backend/Dockerfile
+FROM node:20-alpine
 
-FROM node:18-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --only=production --frozen-lockfile
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src/migration ./dist/migration/
 
+COPY package*.json ./
+RUN npm install # התקן את כל התלויות, כולל devDependencies
+
+# העתק את שאר הקוד רק אם אתה לא משתמש ב-volume שדורס את /app
+# או אם אתה רוצה שה-build יהיה חלק מתהליך בניית האימג'
+# COPY . .
+# RUN npm run build # אפשר להריץ את ה-build הראשוני כאן או ב-command ב-compose
+
+# הפורט של האפליקציה שלך
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+# CMD ["npm", "run", "dev"] # אפשר להגדיר את זה כאן או ב-compose
