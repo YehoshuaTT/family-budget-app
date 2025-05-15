@@ -1,8 +1,13 @@
 {
   "dependencies": {
     "cliui": "^7.0.4",
+    "react-hook-form": "^7.56.3",
+    "recharts": "^2.15.3",
     "strip-ansi": "^6.0.1",
     "typeorm": "^0.3.23",
     "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.6"
   }
 }

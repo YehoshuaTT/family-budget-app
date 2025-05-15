@@ -1,9 +1,50 @@
+// src/App.jsx
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import DashboardPage from './pages/DashboardPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import MainLayout from './components/layout/MainLayout'; // יבא את ה-Layout
+import { useAuth } from './contexts/AuthContext';
+import TransactionsListPage from './pages/TransactionsListPage'; // ניצור בהמשך
+
 function App() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading && !sessionStorage.getItem('authLoadedOnce')) { // הצג טעינה רק פעם אחת בהתחלה
+    return <div className="flex justify-center items-center min-h-screen text-xl">טוען אפליקציה...</div>;
+  }
+  if (!isLoading) {
+      sessionStorage.setItem('authLoadedOnce', 'true');
+  }
+
+
   return (
-    <div>
-      <h1>Frontend is Running</h1>
-      <p>Connect to backend at {import.meta.env.VITE_BACKEND_URL}</p>
-    </div>
-  )
+    <Routes>
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
+      <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignupPage />} />
+
+      {/* Protected Routes use MainLayout */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<MainLayout />}> {/* עוטף את כל הדפים המוגנים ב-MainLayout */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} /> {/* הפניה מהשורש לדשבורד */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/transactions" element={<TransactionsListPage />} /> {/* דף חדש */}
+          {/* <Route path="/budgets" element={<BudgetPage />} /> */}
+          {/* <Route path="/settings" element={<SettingsPage />} /> */}
+        </Route>
+      </Route>
+
+      {/* Fallback for any other route */}
+      <Route
+        path="*"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+        }
+      />
+    </Routes>
+  );
 }
-export default App
+
+export default App;

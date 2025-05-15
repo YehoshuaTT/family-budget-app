@@ -6,10 +6,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Subcategory } from './Subcategory';
 import { Income } from './Income';
-
+import { User } from './User'; // Assuming you have a User entity
 @Entity('categories')
 export class Category {
   @PrimaryGeneratedColumn('increment')
@@ -36,4 +38,11 @@ export class Category {
 
   @OneToMany(() => Income, (income) => income.category)
   incomes!: Income[];
+
+  @Column({ type: 'int', nullable: true }) // nullable: true אם קטגוריות יכולות להיות גם גלובליות (ללא userId)
+userId?: number | null;
+
+@ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' }) // קשר למשתמש
+@JoinColumn({ name: 'userId' })
+user?: User | null;
 }

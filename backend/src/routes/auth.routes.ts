@@ -5,6 +5,8 @@ import { User } from '../entity/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import authMiddleware from '../middleware/auth.middleware'; // if not already imported
+import { AuthenticatedRequest  } from '../middleware/auth.middleware'; // Import the interface for type safety
 
 const router = Router();
 
@@ -107,7 +109,27 @@ router.post(
             console.error(error);
             res.status(500).json({ message: 'Server error during login' });
         }
+    },
+    
+router.get('/profile', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const userRepository = AppDataSource.getRepository(User);
+        const user = await userRepository.findOne({
+            where: { id: userId },
+            // Select only the necessary fields to send to the client
+            select: ["id", "email", "name", "createdAt"], 
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json(user); // Send user object (without password)
+    } catch (error) {
+        console.error("Error fetching user profile:", error);
+        res.status(500).json({ message: "Server error" });
     }
+})
 );
 
 export default router;
