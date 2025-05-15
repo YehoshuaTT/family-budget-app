@@ -98,11 +98,14 @@ router.post(
                 { expiresIn: '1h' } // או זמן אחר
             );
 
+          
             res.json({
                 token,
-                userId: user.id,
-                email: user.email,
-                name: user.name,
+                user: { 
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                }
             });
 
         } catch (error) {
