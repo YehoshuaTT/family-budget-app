@@ -12,6 +12,8 @@ import {
 import { Income } from './Income';
 import { Expense } from './Expense';
 import { UserSettings } from './UserSettings'; // Import UserSettings
+import { BudgetProfile } from './BudgetProfile'; // Add this
+import { Budget } from './Budget';     
 
 @Entity('users')
 export class User {
@@ -40,6 +42,13 @@ export class User {
     (settings: UserSettings) => settings.user, // Point back to the 'user' property on UserSettings
     { cascade: true }
   )
+  
+  @OneToMany(() => BudgetProfile, (profile) => profile.user)
+  budgetProfiles!: BudgetProfile[];
+
+  @OneToMany(() => Budget, (budget) => budget.user) // Direct budgets linked to user
+  budgets!: Budget[];
+  
   // NO @JoinColumn decorator on the inverse side
   settings!: UserSettings; // Property 'settings'
 

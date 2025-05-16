@@ -5,15 +5,17 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn, // Added for soft delete capability
   ManyToOne,
   JoinColumn,
-  Unique, // To ensure only one budget entry per user/subcategory/month/year
+  Unique,
 } from 'typeorm';
 import { User } from './User';
-import { Subcategory } from './Subcategory'; // Budgeting will be at the subcategory level
+import { Subcategory } from './Subcategory';
+import { BudgetProfile } from './BudgetProfile';
 
 @Entity('budgets')
-@Unique(["userId", "subcategoryId", "year", "month"]) // Ensures one budget entry per user, subcategory, for a specific month and year
+@Unique(["budgetProfileId", "subcategoryId", "year", "month"])
 export class Budget {
   @PrimaryGeneratedColumn('increment')
   id!: number;
@@ -25,10 +27,7 @@ export class Budget {
   month!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
-  allocatedAmount!: number; // The amount budgeted for this subcategory for this month/year
-
-  // Optional: could add 'spentAmount' here and update it via triggers or batch jobs,
-  // but for now, we'll calculate spent amount dynamically via queries on Expenses.
+  allocatedAmount!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -36,18 +35,28 @@ export class Budget {
   @UpdateDateColumn()
   updatedAt!: Date;
 
+  @DeleteDateColumn()
+  deletedAt?: Date;
+
   // --- Relationships ---
   @Column({ type: 'int', nullable: false })
-  userId!: number;
+  userId!: number; // Kept for easier querying directly on budgets per user
 
-  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.budgets, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user!: User;
 
   @Column({ type: 'int', nullable: false })
   subcategoryId!: number;
 
-  @ManyToOne(() => Subcategory, { nullable: false, onDelete: 'CASCADE' }) // If subcategory is deleted, budget for it is also deleted
+  @ManyToOne(() => Subcategory, (subcategory) => subcategory.budgets, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'subcategoryId' })
   subcategory!: Subcategory;
+
+  @Column({ type: 'int', nullable: false })
+  budgetProfileId!: number;
+
+  @ManyToOne(() => BudgetProfile, (profile) => profile.budgetAllocations, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'budgetProfileId' })
+  budgetProfile!: BudgetProfile;
 }
