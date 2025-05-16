@@ -12,7 +12,10 @@
     "migrate:run": "npm run typeorm migration:run",
     "migrate": "npm run build && npm run migrate:run",
     "seed": "npm run build && node dist/seed.js",
-    "seed:advanced": "npm run build && node dist/seed-advanced.js"
+    "seed:advanced": "npm run build && node dist/seed-advanced.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -21,30 +24,35 @@
     "bcryptjs": "^2.4.3",
     "cliui": "^7.0.4",
     "cors": "^2.8.5",
-    "date-fns": "^3.6.0", 
+    "date-fns": "^3.6.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.2",
-    "string-width": "^4.2.3", 
-    "strip-ansi": "^6.0.1",   
-    "typeorm": "^0.3.20",    
-    "yargs": "^17.7.2"     
+    "string-width": "^4.2.3",
+    "strip-ansi": "^6.0.1",
+    "typeorm": "^0.3.20",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@faker-js/faker": "^8.4.1", 
+    "@faker-js/faker": "^8.4.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.6",
-    "@types/node": "^20.11.20", 
+    "@types/node": "^20.11.20",
+    "@types/supertest": "^6.0.3",
     "concurrently": "^8.2.2",
-    "cross-env": "^7.0.3",    
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0",
     "nodemon": "^3.0.3",
+    "supertest": "^7.1.1",
+    "ts-jest": "^29.3.3",
     "ts-node": "^10.9.2",
-    "tsconfig-paths": "^4.2.0", 
-    "typescript": "^5.3.3"    
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.3"
   }
 }
