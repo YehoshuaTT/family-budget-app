@@ -95,7 +95,7 @@ router.post(
             const token = jwt.sign(
                 payload,
                 process.env.JWT_SECRET || 'fallback_secret_please_change', // השתמש בסוד חזק מה-.env
-                { expiresIn: '1h' } // או זמן אחר
+                { expiresIn: '24h' } // או זמן אחר
             );
 
           

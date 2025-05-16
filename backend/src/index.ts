@@ -15,6 +15,8 @@ import userSettingsRoutes from './routes/userSettings.routes'; // ADD THIS
 import dashboardRoutes from './routes/dashboard.routes'; // ADD THIS
 import recurringDefinitionRoutes from './routes/recurringDefinition.routes'; // ADD THIS
 import installmentTransactionRoutes from './routes/installmentTransaction.routes'; // ADD THIS
+import budgetProfileRoutes from './routes/budgetProfile.routes'; // ADD THIS
+import budgetRoutes from './routes/budget.routes'; // ודא שזה קיים
 
 // Load environment variables VERY EARLY
 // Use __dirname (points to /app/dist usually at runtime)
@@ -40,6 +42,8 @@ AppDataSource.initialize()
     app.use('/api/expenses', expenseRoutes); // Register
     app.use('/api/recurring-definitions', recurringDefinitionRoutes); // ADD THIS
     app.use('/api/installment-transactions', installmentTransactionRoutes); // ADD THIS
+    app.use('/api/budget-profiles', budgetProfileRoutes); // ADD THIS
+    app.use('/api/budgets', budgetRoutes); // ודא שזה קיים
 
 // Basic route
 app.get('/', (req: Request, res: Response) => {
