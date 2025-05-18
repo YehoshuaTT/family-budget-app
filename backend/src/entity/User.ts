@@ -1,4 +1,4 @@
-// backend/src/entity/User.ts (Correct Standard Pattern)
+// backend/src/entity/User.ts (Corrected)
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,51 +7,56 @@ import {
   UpdateDateColumn,
   OneToMany,
   OneToOne, // Import OneToOne
-  DeleteDateColumn // <-- ADDED
+  DeleteDateColumn
 } from 'typeorm';
 import { Income } from './Income';
 import { Expense } from './Expense';
-import { UserSettings } from './UserSettings'; // Import UserSettings
-import { BudgetProfile } from './BudgetProfile'; // Add this
+import { UserSettings } from './UserSettings';
+import { BudgetProfile } from './BudgetProfile';
 import { Budget } from './Budget';     
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('increment')
-  id!: number; // Property 'id'
+  id!: number;
 
   @Column({ type: 'varchar', length: 255, unique: true, nullable: false })
-  email!: string; // Property 'email'
+  email!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: false, select: false })
-  password!: string; // Property 'password'
+  password!: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  name?: string; // Property 'name'
+  name?: string;
 
-  // --- OneToMany Relations (Keep using string names for now) ---
-  @OneToMany('Income', (income: Income) => income.user)
+  // --- OneToMany Relations ---
+  @OneToMany(() => Income, (income: Income) => income.user) // Changed 'Income' to () => Income
   incomes!: Income[];
 
-  @OneToMany('Expense', (expense: Expense) => expense.user)
+  @OneToMany(() => Expense, (expense: Expense) => expense.user) // Changed 'Expense' to () => Expense
   expenses!: Expense[];
 
-  // --- OneToOne Relation (Inverse Side) ---
-  @OneToOne(
-    () => UserSettings, // Use arrow function pointing to imported UserSettings class
-    (settings: UserSettings) => settings.user, // Point back to the 'user' property on UserSettings
-    { cascade: true }
-  )
-  
   @OneToMany(() => BudgetProfile, (profile) => profile.user)
   budgetProfiles!: BudgetProfile[];
 
-  @OneToMany(() => Budget, (budget) => budget.user) // Direct budgets linked to user
+  @OneToMany(() => Budget, (budget) => budget.user)
   budgets!: Budget[];
-  
-  // NO @JoinColumn decorator on the inverse side
-  settings!: UserSettings; // Property 'settings'
 
+  // --- OneToOne Relation (Inverse Side) ---
+  @OneToOne( // <<--- ה-Decorator הזה צריך להיות מעל 'settings'
+    () => UserSettings,
+    (settings: UserSettings) => settings.user,
+    { cascade: true }
+  )
+  settings!: UserSettings; // <<--- עכשיו ה-Decorator מעל השדה הנכון
+
+  // --- Password Reset Fields ---
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  passwordResetToken?: string | null;
+  
+  @Column({ type: 'timestamp with time zone', nullable: true, select: false }) // שיניתי ל-timestamp with time zone, יותר סטנדרטי
+  passwordResetExpires?: Date | null;
+  
   // --- Timestamps ---
   @CreateDateColumn()
   createdAt!: Date;
@@ -59,6 +64,6 @@ export class User {
   @UpdateDateColumn()
   updatedAt!: Date;
   
-  @DeleteDateColumn() // <-- ADDED
-  deletedAt?: Date;   // Can be nullable
+  @DeleteDateColumn()
+  deletedAt?: Date;
 }

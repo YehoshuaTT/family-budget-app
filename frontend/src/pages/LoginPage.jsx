@@ -115,6 +115,14 @@ function LoginPage() {
           </div>
         </form>
 
+<div className="text-sm text-center mt-4">
+  <Link 
+    to="/forgot-password"
+    className="font-medium text-sky-600 hover:text-sky-800 hover:underline"
+  >
+    שכחת את הסיסמה?
+  </Link>
+</div>
         <p className="mt-8 text-center text-sm text-slate-500">
           אין לך חשבון?{' '}
           <Link to="/signup" className="font-medium text-sky-600 hover:text-sky-500 hover:underline">

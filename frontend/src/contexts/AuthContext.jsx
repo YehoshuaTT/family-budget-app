@@ -9,51 +9,47 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('authToken'));
   const [isLoading, setIsLoading] = useState(true); // Start as true
 
-  const logout = useCallback(() => { // useCallback for logout as it's stable
+  const logout = useCallback(() => {
     localStorage.removeItem('authToken');
     setToken(null);
     setUser(null);
     delete apiClient.defaults.headers.common['Authorization'];
     console.log("User logged out");
-    // Optional: redirect to login page
-    // navigate('/login'); // If you have access to navigate function
   }, []);
 
   const fetchUserProfile = useCallback(async (currentToken) => {
     if (!currentToken) {
-      setUser(null); // Ensure user is null if no token
+      setUser(null);
       setIsLoading(false);
       return;
     }
+    setIsLoading(true); // <--- שינוי חשוב: הגדר isLoading ל-true כאן
     apiClient.defaults.headers.common['Authorization'] = `Bearer ${currentToken}`;
     try {
-      // החלף את '/auth/profile' בנתיב הנכון אם הוא שונה
-      const { data } = await apiClient.get('/auth/profile'); // This endpoint returns the user object
-      setUser(data); // שמור את כל אובייקט המשתמש
-      setToken(currentToken); // Ensure token in state is also set/confirmed
+      const { data } = await apiClient.get('/auth/profile');
+      setUser(data);
+      setToken(currentToken);
     } catch (error) {
       console.error("Token validation/profile fetch failed:", error.response?.data?.message || error.message);
-      logout(); // Call logout to clear everything if token is invalid
+      logout();
     } finally {
       setIsLoading(false);
     }
-  }, [logout]); // Add logout to dependency array of fetchUserProfile
+  }, [logout]);
 
   useEffect(() => {
     const currentToken = localStorage.getItem('authToken');
     if (currentToken) {
       fetchUserProfile(currentToken);
     } else {
-      setIsLoading(false); // No token, so authentication check is done, not loading.
+      setIsLoading(false);
     }
-  }, [fetchUserProfile]); // fetchUserProfile is stable due to useCallback
+  }, [fetchUserProfile]);
 
   const login = async (email, password) => {
     setIsLoading(true);
     try {
       const response = await apiClient.post('/auth/login', { email, password });
-      // ודא שהשרת מחזיר אובייקט user מלא בנוסף לטוקן
-      // למשל: { token: "...", user: { id: 1, email: "...", name: "..." } }
       const { token: newToken, user: userData } = response.data;
 
       if (!newToken || !userData) {
@@ -62,15 +58,14 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem('authToken', newToken);
       setToken(newToken);
-      setUser(userData); // שמור את כל אובייקט המשתמש
+      setUser(userData);
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       setIsLoading(false);
       return { success: true, user: userData };
     } catch (error) {
       console.error("Login failed:", error.response?.data?.message || error.message);
       setIsLoading(false);
-      // במקרה של שגיאת התחברות, נקה כל משתמש/טוקן קודם
-      logout(); // Ensures clean state on login failure
+      logout();
       return { success: false, message: error.response?.data?.message || "Login failed" };
     }
   };
@@ -95,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
-    isAuthenticated: !isLoading && !!user, // User is authenticated if not loading and user object exists
+    isAuthenticated: !isLoading && !!user,
     fetchUserProfile,
   };
 
@@ -104,7 +99,7 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined || context === null) { // Check for undefined or null
+  if (context === undefined || context === null) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

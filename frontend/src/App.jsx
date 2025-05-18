@@ -5,15 +5,17 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import MainLayout from './components/layout/MainLayout'; // יבא את ה-Layout
+import MainLayout from './components/layout/MainLayout'; 
 import { useAuth } from './contexts/AuthContext';
-import TransactionsListPage from './pages/TransactionsListPage'; // ניצור בהמשך
-import UserSettingsPage from './pages/UserSettingsPage'; // יבא את העמוד החדש
+import TransactionsListPage from './pages/TransactionsListPage'; 
+import UserSettingsPage from './pages/UserSettingsPage'; 
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading && !sessionStorage.getItem('authLoadedOnce')) { // הצג טעינה רק פעם אחת בהתחלה
+  if (isLoading && !sessionStorage.getItem('authLoadedOnce')) {
     return <div className="flex justify-center items-center min-h-screen text-xl">טוען אפליקציה...</div>;
   }
   if (!isLoading) {
@@ -25,6 +27,8 @@ function App() {
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
       {/* Protected Routes use MainLayout */}
       <Route element={<ProtectedRoute />}>

@@ -10,6 +10,7 @@ import { InstallmentTransaction } from '../entity/InstallmentTransaction';
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { addMonths, format, parseISO, isValid as isValidDate } from 'date-fns';
 import { buildExpenseResponse  } from '../utils/responseBuilders';
+import { IsNull } from 'typeorm';
 
 const router = Router();
 
@@ -403,7 +404,65 @@ router.patch(
       console.error('Error restoring expense:', error);
       res.status(500).json({ message: `Server error: ${error.message || 'Failed to restore expense'}` });
     }
+  },
+  
+// --- Mark an expense as processed ---
+// PATCH /api/expenses/:id/process
+router.patch(
+  '/:id/process',
+  authMiddleware,
+  [
+    param('id').isInt({ gt: 0 }).withMessage('Expense ID must be a positive integer.')
+  ],
+  async (req: AuthenticatedRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const expenseId = parseInt(req.params.id, 10);
+    const userId = req.user!.id;
+
+    try {
+      const expenseRepository = AppDataSource.getRepository(Expense);
+      const expense = await expenseRepository.findOne({
+        where: { id: expenseId, userId: userId, deletedAt: IsNull() } // ודא שההוצאה לא מחוקה
+      });
+
+      if (!expense) {
+        return res.status(404).json({ message: 'Expense not found or you are not authorized to modify it' });
+      }
+
+      if (expense.expenseType === 'single') { // הוצאות "single" כבר מסומנות isProcessed: true ביצירה
+        return res.status(400).json({ message: 'Single expenses are already processed.'});
+      }
+
+      if (expense.isProcessed) {
+        return res.status(400).json({ message: 'Expense is already marked as processed' });
+      }
+
+      expense.isProcessed = true;
+      // אופציונלי: אם רוצים לעדכן את התאריך לתאריך הנוכחי בעת הסימון עבור הוצאות מתוכננות
+      // אם תאריך ההוצאה המקורי היה בעתיד, אולי עדיף לא לשנות אותו, אלא רק את isProcessed.
+      // if (parseISO(expense.date) > new Date()) {
+      //   expense.date = format(new Date(), 'yyyy-MM-dd');
+      // }
+      
+      await expenseRepository.save(expense);
+      
+      // החזר את ההוצאה המעודכנת
+      const updatedExpenseWithRelations = await expenseRepository.findOne({ 
+          where: { id: expense.id }, 
+          relations: ["subcategory", "subcategory.category"] // טען יחסים לתגובה מלאה
+      });
+      res.json(buildExpenseResponse(updatedExpenseWithRelations!));
+
+    } catch (error: any) {
+      console.error(`Error marking expense ${expenseId} as processed:`, error);
+      res.status(500).json({ message: 'Server error while processing expense' });
+    }
   }
+)
 );
 
 export default router;

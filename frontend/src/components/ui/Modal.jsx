@@ -9,14 +9,21 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
         onClose();
       }
     };
+
     if (isOpen) {
+      document.body.style.overflow = 'hidden'; // מנע גלילה של הרקע כשהמודל פתוח
       document.addEventListener('keydown', handleEscape);
+    } else {
+      document.body.style.overflow = 'unset'; // אפשר גלילה חזרה כשהמודל סגור
     }
+
     return () => {
+      document.body.style.overflow = 'unset'; // נקה גם ב-unmount
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen, onClose]);
 
+  // אם isOpen הוא false, אל תרנדר כלום
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -27,31 +34,46 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     '2xl': 'max-w-2xl',
   };
 
+  const modalSizeClass = sizeClasses[size] || sizeClasses.md;
+
   return (
+    // Overlay
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out rtl"
+      className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4 z-[999] transition-opacity duration-300 ease-in-out" // הגדלתי קצת את ה-opacity וה-z-index
       onClick={onClose} // סגירה בלחיצה על הרקע
+      role="dialog" // נגישות
+      aria-modal="true" // נגישות
+      aria-labelledby="modal-title" // נגישות - הכותרת של המודל
     >
+      {/* Modal Content */}
       <div
-        className={`bg-white rounded-xl shadow-2xl overflow-hidden w-full ${sizeClasses[size] || sizeClasses.md} transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow`}
+        // הקלאסים הבאים קובעים את המצב ההתחלתי של האנימציה (לפני שהיא רצה)
+        // והקלאס animate-modalShow מפעיל את האנימציה שהגדרת ב-CSS
+        className={`bg-white rounded-xl shadow-2xl overflow-hidden w-full ${modalSizeClass} 
+                    transform transition-all duration-300 ease-out 
+                    ${isOpen ? 'scale-100 opacity-100 animate-modalShow' : 'scale-95 opacity-0'}`} // אנימציה מותנית
         onClick={(e) => e.stopPropagation()} // מניעת סגירה בלחיצה על תוכן המודל
+        role="document" // נגישות
       >
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h3 className="text-xl font-semibold text-slate-700">{title}</h3>
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200">
+          <h3 className="text-lg sm:text-xl font-semibold text-slate-700" id="modal-title">
+            {title}
+          </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="p-1 rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500"
             aria-label="סגור מודל"
           >
-            <FiX className="h-6 w-6" />
+            <FiX className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </div>
-        <div className="p-6">
+
+        {/* Modal Body */}
+        <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto"> {/* הגבלת גובה וגלילה לתוכן */}
           {children}
         </div>
       </div>
-      {/* אנימציה למודל ב-CSS (אפשר להוסיף ל-index.css או tailwind.config.js) */}
-     
     </div>
   );
 };
