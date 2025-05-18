@@ -2,6 +2,7 @@
 import { Router, Response }
 from 'express';
 import { body, validationResult } from 'express-validator';
+import bcrypt from 'bcryptjs'; // <<< הוסף ייבוא
 import { AppDataSource } from '../data-source';
 import { User } from '../entity/User';
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -86,7 +87,80 @@ router.get('/profile', authMiddleware, async (req: AuthenticatedRequest, res: Re
         console.error('Error fetching user profile:', error);
         res.status(500).json({ message: 'Server error' });
     }
-});
+},
+router.post(
+    '/change-password',
+    authMiddleware, // ודא שהמשתמש מחובר
+    [
+        body('currentPassword')
+            .notEmpty().withMessage('Current password is required.'),
+        body('newPassword')
+            .isLength({ min: 8 }).withMessage('New password must be at least 8 characters long.')
+            .custom((value, { req }) => {
+                if (value === req.body.currentPassword) {
+                    throw new Error('New password cannot be the same as the current password.');
+                }
+                return true;
+            }),
+        body('confirmNewPassword')
+            .custom((value, { req }) => {
+                if (value !== req.body.newPassword) {
+                    throw new Error('New passwords do not match.');
+                }
+                return true;
+            }),
+    ],
+    async (req: AuthenticatedRequest, res: Response) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const userId = req.user!.id;
+        const { currentPassword, newPassword } = req.body;
+
+        try {
+            const userRepository = AppDataSource.getRepository(User);
+            
+            // חשוב: כששולפים את המשתמש, צריך לכלול את שדה הסיסמה שלו,
+            // למרות שהוא מוגדר כ-select: false ב-Entity.
+            const user = await userRepository.createQueryBuilder("user")
+                .addSelect("user.password") // בחר במפורש את עמודת הסיסמה
+                .where("user.id = :id", { id: userId })
+                .getOne();
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // 2. אמת את הסיסמה הנוכחית
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ 
+                    errors: [{ path: 'currentPassword', msg: 'Incorrect current password.' }] 
+                });
+            }
+
+            // 3. הצפן את הסיסמה החדשה
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(newPassword, salt);
+
+            // 4. שמור את המשתמש עם הסיסמה החדשה
+            await userRepository.save(user);
+
+            // אופציונלי: invalidate all other sessions/tokens for this user for security
+            // This logic would depend on how you manage sessions/tokens (e.g., a token blacklist)
+
+            res.status(200).json({ message: 'Password changed successfully.' });
+
+        } catch (error: any) {
+            console.error('Error changing password:', error);
+            res.status(500).json({ message: `Server error: ${error.message || 'Failed to change password'}` });
+        }
+    }
+)
+
+);
 
 
 export default router;
