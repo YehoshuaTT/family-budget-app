@@ -9,6 +9,7 @@ import { RecurringExpenseDefinition } from './RecurringExpenseDefinition'; // Ne
 import { InstallmentTransaction } from './InstallmentTransaction';     // New
 import { Budget } from './Budget'; // <-- הוסף
 import { BudgetProfile } from './BudgetProfile';
+import { RecurringIncomeDefinition } from './RecurringIncomeDefinition'; // New
 
 export const ALL_ENTITIES = [
   User,
@@ -20,5 +21,6 @@ export const ALL_ENTITIES = [
   RecurringExpenseDefinition, // Add new
   InstallmentTransaction ,
   Budget,
-  BudgetProfile
+  BudgetProfile,
+  RecurringIncomeDefinition // Add new
 ];

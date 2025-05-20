@@ -27,7 +27,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DB_PORT}/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       DB_HOST: ${DB_HOST} # עדיין חשוב, כי data-source.ts משתמש בו
-      # CHOKIDAR_USEPOLLING: "true" # לפעמים עוזר ל-nodemon/tsc -w לזהות שינויים טוב יותר בתוך Docker
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
     depends_on:
       - db
     env_file:

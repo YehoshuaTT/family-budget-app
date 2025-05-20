@@ -1,65 +1,60 @@
 // backend/src/routes/category.routes.ts
 import { Router, Request, Response } from 'express';
-import { AppDataSource } from '../data-source'; // CJS: No .js
-import { Category } from '../entity/Category';     // CJS: No .js
-// We don't strictly need Subcategory import if we use relations correctly
+import { AppDataSource } from '../data-source';
+import { Category } from '../entity/Category';
+import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
+// IsNull לא נצטרך אותו ישירות כאן עם QueryBuilder
 
 const router = Router();
 
-// GET /api/categories - Fetch all active categories and their active subcategories
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const typeQuery = req.query.type as string | undefined;
+
   try {
     const categoryRepository = AppDataSource.getRepository(Category);
+    
+    let queryBuilder = categoryRepository.createQueryBuilder("category")
+      .leftJoinAndSelect("category.subcategories", "subcategory", "subcategory.archived = :isNotArchived", { isNotArchived: false }) // טען תתי-קטגוריות לא מאורכבות
+      .where("category.archived = :isNotArchived", { isNotArchived: false })
+      .andWhere("(category.userId = :userId OR category.userId IS NULL)", { userId: userId }) // התנאי החשוב כאן
+      .orderBy("category.name", "ASC")
+      .addOrderBy("subcategory.name", "ASC"); // מיון גם תתי-קטגוריות
 
-    // Fetch categories with their subcategories using relations
-    // Filter out archived categories AND archived subcategories
-    const categories = await categoryRepository.find({
-      where: {
-        archived: false, // Only get non-archived categories
-        subcategories: { // Filter nested relation
-            archived: false // Only include non-archived subcategories
-        }
-      },
-      relations: {
-        subcategories: true // Eagerly load the subcategories relation
-      },
-      select: { // Select only the fields needed for the response
-        id: true,
-        name: true,
-        type: true,
-        subcategories: { // Select specific fields from the nested relation
-          id: true,
-          name: true,
-          // No need for categoryId or archived status in the response here
-        }
-      },
-      order: { // Optional: order categories and subcategories
-        name: "ASC", // Order categories by name
-        subcategories: {
-          name: "ASC" // Order subcategories by name
-        }
-      }
-    });
+    if (typeQuery === 'expense' || typeQuery === 'income') {
+      queryBuilder = queryBuilder.andWhere("category.type = :type", { type: typeQuery });
+    }
+    
+    // אם typeQuery הוא לא 'expense', אל תטען תתי-קטגוריות כלל (כי הן רלוונטיות רק להוצאות)
+    if (typeQuery !== 'expense') {
+        // כדי למנוע טעינה של subcategories, נצטרך לבנות את השאילתה מעט אחרת
+        // או פשוט לא להשתמש ב-subcategories בהמשך אם זה income.
+        // ה-leftJoinAndSelect למעלה כבר עושה את העבודה, אבל אם זה income, המערך יהיה ריק.
+    }
 
-    res.json(categories);
+    const categories = await queryBuilder.getMany();
+    
+    // המיפוי יכול להישאר דומה, אבל כבר אין צורך לסנן subcategories.archived כאן כי ה-DB עשה זאת.
+    const responseCategories = categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        name_he: (cat as any).name_he || cat.name, // אם יש לך שדה כזה
+        type: cat.type,
+        userId: cat.userId,
+        subcategories: cat.type === 'expense' ? (cat.subcategories || []).map(sub => ({ // ודא ש-subcategories קיים
+            id: sub.id,
+            name: sub.name,
+            name_he: (sub as any).name_he || sub.name,
+        })) : [] // החזר מערך ריק אם זה לא הוצאה
+    }));
 
-  } catch (error) {
+    res.json(responseCategories);
+
+  } catch (error: any) {
     console.error("Error fetching categories:", error);
-    res.status(500).json({ message: 'Server error fetching categories' });
+    // החזר את השגיאה המקורית לדיבוג טוב יותר
+    res.status(500).json({ message: `Server error fetching categories: ${error.message}`, details: error.toString() });
   }
 });
 
-// --- Future Endpoints (Example Stubs) ---
-
-// POST /api/categories - Add a new category (Admin only? Or not for POC?)
-// router.post('/', async (req: Request, res: Response) => { ... });
-
-// PUT /api/categories/:id/archive - Archive a category
-// router.put('/:id/archive', async (req: Request, res: Response) => { ... });
-
-// PUT /api/categories/:id/unarchive - Unarchive a category
-// router.put('/:id/unarchive', async (req: Request, res: Response) => { ... });
-
-// Maybe similar endpoints for subcategories? Or manage them through the category?
-
-export default router; // Use export default for CJS compatibility via TS
+export default router;

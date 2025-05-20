@@ -11,6 +11,10 @@ import installmentTransactionRoutes from './installmentTransaction.routes';
 import budgetProfileRoutes from './budgetProfile.routes';
 import budgetRoutes from './budget.routes';
 import userRoutes from './user.routes'; // <<< הוסף ייבוא זה
+import recurringIncomeRoutes from './recurringIncome.routes'; // <<< הוסף
+
+// ...
+
 // ייבא middleware אם יש לך middleware גלובלי לכל ה-API (כמו auth.middleware)
 // import authMiddleware from '../middleware/auth.middleware';
 
@@ -31,5 +35,6 @@ mainRouter.use('/budget-profiles', budgetProfileRoutes);
 mainRouter.use('/budgets', budgetRoutes);
 mainRouter.use('/user-settings', userSettingsRoutes); // זה מטפל בהגדרות האפליקציה של המשתמש
 mainRouter.use('/users', userRoutes);               // <<< זה יטפל בפעולות על המשתמש עצמו (כמו פרופיל)
+mainRouter.use('/recurring-income-definitions', recurringIncomeRoutes); // <<< הוסף
 
 export default mainRouter;

@@ -8,23 +8,39 @@ import { Category } from '../entity/Category'; // For associating income categor
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { format, parseISO } from 'date-fns';
 import { buildIncomeResponse } from '../utils/responseBuilders';
+import { In, IsNull } from 'typeorm';
 
 const router = Router();
 
 // --- Validation Rules for Create/Update Income ---
+
 const incomeValidationRules = [
-  body('amount').notEmpty().withMessage('Amount is required.')
+  body('amount')
+    .notEmpty().withMessage('Amount is required.')
     .isNumeric().withMessage('Amount must be a number.')
-    .bail().custom(value => parseFloat(value) > 0).withMessage('Amount must be positive.'),
-  body('date').notEmpty().withMessage('Date is required.')
+    .bail() // עצור ולידציות נוספות לשדה זה אם הקודמות נכשלו
+    .custom(value => parseFloat(value) > 0).withMessage('Amount must be positive.'),
+
+  body('date')
+    .notEmpty().withMessage('Date is required.')
     .isISO8601().withMessage('Invalid date format, please use YYYY-MM-DD.')
-    .customSanitizer(value => value ? format(parseISO(value), 'yyyy-MM-dd') : null), // Sanitize to 'yyyy-MM-dd' string
-  body('categoryId').optional({ nullable: true }).isInt({ gt: 0 }).withMessage('Category ID must be a positive integer if provided.'),
-  body('description').optional({ nullable: true, checkFalsy: true }).isString().trim().isLength({ max: 255 }).withMessage('Description cannot exceed 255 characters.'),
+    .customSanitizer(value => value ? format(parseISO(value), 'yyyy-MM-dd') : null),
+
+  body('categoryId') // ולידציה לקטגוריה
+    .optional({ checkFalsy: true }) // מאפשר "" או null או undefined לעבור. ירוץ רק אם יש ערך "אמיתי"
+    .isInt({ gt: 0 }).withMessage('Category ID must be a positive integer if provided.')
+    .toInt(), // המר למספר אם זה אכן מחרוזת של מספר
+
+  body('description') // ולידציה לתיאור
+    .optional({ nullable: true, checkFalsy: true }) // מאפשר "" או null או undefined
+    .isString().withMessage('Description must be a string.') // ודא שזה מחרוזת
+    .trim() // הסר רווחים מיותרים
+    .isLength({ max: 255 }).withMessage('Description cannot exceed 255 characters.')
 ];
 
 // --- Create a new Income ---
 // POST /api/incomes
+
 router.post(
   '/',
   authMiddleware,
@@ -40,32 +56,43 @@ router.post(
 
     try {
       const incomeRepository = AppDataSource.getRepository(Income);
-      const userRepository = AppDataSource.getRepository(User); // To fetch the User entity
+      const userRepository = AppDataSource.getRepository(User);
       const categoryRepository = AppDataSource.getRepository(Category);
 
       const user = await userRepository.findOneBy({ id: userId });
       if (!user) return res.status(404).json({ message: 'User not found for token' });
 
-      let category: Category | null = null;
-      if (categoryId) {
-        category = await categoryRepository.findOne({
-            where: { id: parseInt(categoryId, 10), type: 'income', archived: false }
-        });
-        if (!category) return res.status(400).json({ message: 'Income category not found, is not of type "income", or is archived.' });
+      let categoryEntity: Category | null = null; // שיניתי את השם כדי למנוע התנגשות עם categoryId
+      if (categoryId) { // categoryId כבר אמור להיות מספר מהולידציה או undefined
+        console.log(`POST /incomes: Searching for category ID: ${categoryId} for user: ${userId} or global, type: income`);
+        
+        categoryEntity = await categoryRepository.createQueryBuilder("cat")
+            .where("cat.id = :id", { id: categoryId })
+            .andWhere("cat.type = :type", { type: 'income' })
+            .andWhere("cat.archived = :archived", { archived: false })
+            .andWhere("(cat.userId = :userId OR cat.userId IS NULL)", { userId: userId })
+            .getOne(); // השתמש ב-getOne כי אנחנו מצפים לאחד או אפס
+
+        console.log('POST /incomes: Found category:', categoryEntity);
+
+        if (!categoryEntity) {
+          return res.status(400).json({ message: `Income category with ID ${categoryId} not found, is not of type 'income', is archived, or not accessible to this user.` });
+        }
+      } else {
+        console.log('POST /incomes: No categoryId provided.');
       }
 
       const newIncome = incomeRepository.create({
-        amount: parseFloat(amount),
-        date: date, // Already formatted string
-        description,
-        user: user, // Associate with the User entity
-        category: category || undefined, // Associate with Category entity, or undefined if no categoryId
-        categoryId: category ? category.id : undefined,
+        amount: parseFloat(amount), // amount כבר אמור להיות float מהולידציה
+        date: date,
+        description: description || undefined, // השתמש ב-undefined אם הוא ריק
+        user: user,
+        categoryId: categoryEntity ? categoryEntity.id : undefined, // השתמש ב-undefined
+        // category: categoryEntity || undefined, // TypeORM יטפל בזה דרך categoryId אם היחס מוגדר
       });
 
       await incomeRepository.save(newIncome);
 
-      // Fetch again with relations for a consistent response
       const createdIncomeWithRelations = await incomeRepository.findOne({
           where: { id: newIncome.id },
           relations: ["category"]
@@ -79,6 +106,7 @@ router.post(
     }
   }
 );
+
 
 // --- Get all Incomes for the authenticated user ---
 // GET /api/incomes
