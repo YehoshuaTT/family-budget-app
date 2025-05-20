@@ -31,15 +31,31 @@ const SkeletonRow = () => (
 // Function to fetch ALL transactions (client-side filtering/pagination for now)
 const fetchAllTransactions = async () => {
   // במצב אידיאלי, ה-API יקבל את כל פרמטרי הסינון, המיון והדפדוף
-  const [incomesRes, expensesRes] = await Promise.all([
+  const [incomesRes, expensesRes, recurringIncomeDefsRes] = await Promise.all([
     apiClient.get('/incomes'), // שלוף את כל ההכנסות
-    apiClient.get('/expenses')  // שלוף את כל ההוצאות
+    apiClient.get('/expenses'),  // שלוף את כל ההוצאות
+    apiClient.get('/recurring-income-definitions') // שלוף את כל ההגדרות של הכנסה חוזרת
   ]);
 
   const incomes = incomesRes.data.map(inc => ({ ...inc, type: 'income', transactionDate: inc.date, isExpense: false }));
   const expenses = expensesRes.data.map(exp => ({ ...exp, type: 'expense', transactionDate: exp.date, isExpense: true }));
-  
-  let allTransactions = [...incomes, ...expenses];
+
+  // הוסף את ההגדרות של הכנסה חוזרת כפעולות מתוכננות
+  const recurringIncomeDefs = (recurringIncomeDefsRes.data || []).map(def => ({
+    ...def,
+    id: def.id,
+    type: 'income',
+    isRecurringInstance: true,
+    isProcessed: false, // הגדרה מתוכננת, לא בוצעה
+    transactionDate: def.nextDueDate || def.startDate, // תאריך הבא או תאריך התחלה
+    date: def.nextDueDate || def.startDate,
+    description: (def.description || '') + ' (מתוכנן)',
+    categoryId: def.categoryId,
+    category: def.category,
+    // אפשר להוסיף שדות נוספים במידת הצורך
+  }));
+
+  let allTransactions = [...incomes, ...expenses, ...recurringIncomeDefs];
   // מיון ברירת מחדל (יישאר גם אם המיון הדינמי יחליף אותו מאוחר יותר)
   allTransactions.sort((a, b) => parseISO(b.transactionDate).getTime() - parseISO(a.transactionDate).getTime() || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return allTransactions;
@@ -50,8 +66,14 @@ const restoreMutationFn = async ({ type, id }) => {
     return apiClient.patch(endpoint);
 };
 
-const markAsProcessedMutationFn = async (expenseId) => {
-    return apiClient.patch(`/expenses/${expenseId}/process`);
+// --- End Helper Functions ---
+
+const markAsProcessedMutationFn = async (transaction) => {
+    if (transaction.type === 'income') {
+        return apiClient.patch(`/incomes/${transaction.id}/mark-processed`);
+    } else {
+        return apiClient.patch(`/expenses/${transaction.id}/process`);
+    }
 };
 
 function TransactionsListPage() {
@@ -99,6 +121,26 @@ function TransactionsListPage() {
     },
     staleTime: Infinity, // קטגוריות לא משתנות בתדירות גבוהה
   });
+
+
+  // useQuery for monthly summary (and error)
+const selectedPeriodForSummary = useMemo(() => {
+    if (dateRange.from) {
+        return format(dateRange.from, 'yyyy-MM');
+    }
+    return format(new Date(), 'yyyy-MM');
+}, [dateRange.from]);
+
+
+const { data: periodSummary, isLoading: isLoadingSummary, error: periodSummaryError } = useQuery({
+    queryKey: ['dashboardSummary', selectedPeriodForSummary],
+    queryFn: async () => {
+        const { data } = await apiClient.get(`/dashboard/summary?period=${selectedPeriodForSummary}`);
+        return data;
+    },
+    enabled: !!selectedPeriodForSummary,
+    staleTime: 1000 * 60 * 5,
+});
 
 
   // Client-side filtering, sorting, and pagination
@@ -192,7 +234,11 @@ function TransactionsListPage() {
 
 
   const deleteMutation = useMutation({
-    mutationFn: ({ type, id }) => {
+    mutationFn: ({ type, id, isRecurringInstance }) => {
+      // אם זו recurring income definition, שלח ל-endpoint המתאים
+      if (type === 'income' && isRecurringInstance) {
+        return apiClient.delete(`/recurring-income-definitions/${id}`);
+      }
       const endpoint = type === 'income' ? `/incomes/${id}` : `/expenses/${id}`;
       return apiClient.delete(endpoint);
     },
@@ -235,9 +281,9 @@ function TransactionsListPage() {
     }
   });
 
-  const handleDelete = (type, id) => {
+  const handleDelete = (type, id, isRecurringInstance) => {
     if (window.confirm(`האם אתה בטוח שברצונך למחוק (לארכב) ${type === 'income' ? 'הכנסה' : 'הוצאה'} זו?`)) {
-      deleteMutation.mutate({ type, id });
+      deleteMutation.mutate({ type, id, isRecurringInstance });
     }
   };
   
@@ -247,9 +293,9 @@ function TransactionsListPage() {
     }
   };
   
-  const handleMarkAsProcessed = (expenseId) => {
-    if (window.confirm('האם אתה בטוח שברצונך לסמן הוצאה זו כבוצעה?')) {
-        markAsProcessedMutation.mutate(expenseId);
+  const handleMarkAsProcessed = (transaction) => {
+    if (window.confirm(`האם אתה בטוח שברצונך לסמן ${transaction.type === 'income' ? 'הכנסה' : 'הוצאה'} זו כבוצעה?`)) {
+        markAsProcessedMutation.mutate(transaction);
     }
   };
 
@@ -265,13 +311,13 @@ function TransactionsListPage() {
     setIsModalOpen(true);
   };
 
- 
+// הוצאנו את ה-hook החוצה, getTransactionDisplayDetails היא פונקציה רגילה
 const getTransactionDisplayDetails = (transaction) => {
-  let categoryDisplay = 'ללא קטגוריה'; // ברירת מחדל
+  let categoryDisplay = 'ללא קטגוריה';
   let mainCategoryForTooltip = '';
 
   if (transaction.type === 'income' && transaction.category) {
-      categoryDisplay = transaction.category.name_he || transaction.category.name; // נניח שיש name_he, אחרת name
+      categoryDisplay = transaction.category.name_he || transaction.category.name;
       mainCategoryForTooltip = categoryDisplay;
   } else if (transaction.type === 'expense' && transaction.subcategory) {
       const subcatName = transaction.subcategory.name_he || transaction.subcategory.name;
@@ -279,57 +325,21 @@ const getTransactionDisplayDetails = (transaction) => {
           mainCategoryForTooltip = transaction.subcategory.category.name_he || transaction.subcategory.category.name;
           categoryDisplay = `${mainCategoryForTooltip} - ${subcatName}`;
       } else {
-          categoryDisplay = subcatName; // אם אין קטגוריה ראשית משויכת (פחות סביר)
+          categoryDisplay = subcatName;
           mainCategoryForTooltip = subcatName;
       }
   }
 
-    // Hook לשליפת סיכום הנתונים הפיננסיים לתקופה הנוכחית (דומה לדשבורד)
-    const selectedPeriodForSummary = useMemo(() => {
-        // אם רוצים תמיד חודש מלא לפי ה-dateRange.from
-        if (dateRange.from) {
-            return format(dateRange.from, 'yyyy-MM');
-        }
-        return format(new Date(), 'yyyy-MM'); // ברירת מחדל לחודש הנוכחי
-    }, [dateRange.from]);
-
-
-    const { data: periodSummary, isLoading: isLoadingSummary, error: periodSummaryError } = useQuery({
-    queryKey: ['dashboardSummary', selectedPeriodForSummary],
-    queryFn: async () => {
-        const { data } = await apiClient.get(`/dashboard/summary?period=${selectedPeriodForSummary}`);
-        return data;
-    },
-    enabled: !!selectedPeriodForSummary, // השתמש ב-selectedPeriodForSummary לבדיקה, כי dateRange.from יכול להיות null
-    staleTime: 1000 * 60 * 5, // Cache summary for 5 minutes for example
-});
-
   let finalDescription = transaction.description || categoryDisplay;
-  
-  // אם יש גם תיאור וגם קטגוריה שונה מ"ללא קטגוריה", אולי נרצה להציג את שניהם.
-  // לדוגמה, אם רוצים שהקטגוריה תמיד תופיע:
-  // if (transaction.description && categoryDisplay !== 'ללא קטגוריה') {
-  //   finalDescription = `${transaction.description} (${categoryDisplay})`;
-  // } else {
-  //   finalDescription = transaction.description || categoryDisplay;
-  // }
-
   if (transaction.expenseType === 'recurring_instance') finalDescription = `(ח) ${finalDescription}`;
   if (transaction.expenseType === 'installment_instance') finalDescription = `(ת) ${finalDescription}`;
-  
+
   return {
     displayDescription: finalDescription,
-    // ה-tooltip יכול להציג את הפירוט המלא אם התיאור הראשי קוצץ
     tooltipText: transaction.description && transaction.description !== categoryDisplay ? `${transaction.description} [${categoryDisplay}]` : finalDescription,
     icon: transaction.type === 'income' ? <FiDollarSign className="text-green-500" /> : <FiCreditCard className="text-red-500" />
   };
 };
-
-// ואז בעת רינדור השורה:
-// <p className="text-slate-800 whitespace-no-wrap truncate max-w-xs" title={displayDetails.tooltipText}>
-//   {displayDetails.displayDescription}
-// </p>
-
 
   const handleSort = (key) => {
     let direction = 'ascending';
@@ -554,12 +564,12 @@ const getTransactionDisplayDetails = (transaction) => {
               <th className="px-5 py-3">סוג</th>
               <SortableHeader columnKey="amount" title="סכום" />
               <th className="px-5 py-3">סטטוס</th>
-              <th className="px-5 py-3 text-center">פעולות</th> {/* ממורכז */}
+              <th className="px-5 py-3 text-center">פעולות</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && !rawTransactions && [...Array(itemsPerPage > 7 ? 7 : itemsPerPage)].map((_, i) => <SkeletonRow key={`skel-full-load-${i}`} />)}
-            {isLoading && rawTransactions && transactions.length === 0 && [...Array(3)].map((_, i) => <SkeletonRow key={`skel-filter-load-${i}`} />)} {/* Skeleton קצר יותר בזמן סינון */}
+            {isLoading && rawTransactions && transactions.length === 0 && [...Array(3)].map((_, i) => <SkeletonRow key={`skel-filter-load-${i}`} />)}
             
             {!isLoading && transactions && transactions.length > 0 ? (
               transactions.map((tx) => {
@@ -580,11 +590,11 @@ const getTransactionDisplayDetails = (transaction) => {
                 }
 
                 return (
-                  <tr key={`${tx.type}-${tx.id}-${tx.createdAt}`} className={rowClassName}> {/* הוספתי createdAt למפתח למקרה שיש תנועות זהות */}
+                  <tr key={`${tx.type}-${tx.id}-${tx.createdAt}`} className={rowClassName}>
                     <td className="px-5 py-3 border-b border-slate-200"><p className="text-slate-700 whitespace-no-wrap">{tx.date ? format(parseISO(tx.date), 'dd/MM/yy', { locale: he }) : '-'}</p></td>
                     <td className="px-5 py-3 border-b border-slate-200">
                         <div className="flex items-center">
-                            <div className="ml-3 p-1.5 bg-slate-100 rounded-full shrink-0">{displayDetails.icon}</div> {/* החלפתי mr ל-ml */}
+                            <div className="ml-3 p-1.5 bg-slate-100 rounded-full shrink-0">{displayDetails.icon}</div>
                             <p className="text-slate-800 whitespace-no-wrap truncate max-w-xs" title={displayDetails.tooltipText}>
                                 {displayDetails.displayDescription}
                             </p>
@@ -601,16 +611,21 @@ const getTransactionDisplayDetails = (transaction) => {
                     <td className="px-5 py-3 border-b border-slate-200">
                         <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap ${
                             isDeleted ? 'bg-gray-200 text-gray-600' : 
-                            (tx.isExpense && !tx.isProcessed ? 'bg-sky-200 text-sky-800 font-medium' : 
-                            'bg-slate-200 text-slate-700')
+                            (tx.isRecurringInstance && tx.type === 'income') ? 'bg-sky-200 text-sky-800 font-medium' :
+                            (tx.isExpense && !tx.isProcessed ? 'bg-sky-200 text-sky-800 font-medium' : 'bg-slate-200 text-slate-700')
                         }`}>
-                            {isDeleted ? 'מאורכב' : (tx.isExpense && !tx.isProcessed ? 'מתוכנן לביצוע' : 'בוצע/רלוונטי')}
-                        </span>
+        {/* סטטוס */}
+        {isDeleted ? 'מאורכב' :
+            (tx.isRecurringInstance && tx.type === 'income') ? 'מתוכנן' :
+            (tx.isExpense && !tx.isProcessed ? 'מתוכנן לביצוע' :
+            (tx.type === 'income' && !tx.isProcessed ? 'בוצע/רלוונטי' : 'בוצע/רלוונטי'))
+        }
+    </span>
                     </td>
                     <td className="px-5 py-3 border-b border-slate-200">
-                        <div className="flex items-center justify-center space-x-1 space-x-reverse"> {/* ממורכז */}
-                            {!isDeleted && tx.isExpense && !tx.isProcessed && (
-                                <button onClick={() => handleMarkAsProcessed(tx.id)} title="סמן כבוצע" className="text-slate-500 hover:text-green-600 p-1.5 rounded-md hover:bg-green-100 disabled:opacity-50" disabled={markAsProcessedMutation.isLoading && markAsProcessedMutation.variables === tx.id}>
+                        <div className="flex items-center justify-center space-x-1 space-x-reverse">
+                            {!isDeleted && ((tx.isExpense && tx.isProcessed === false) || (tx.type === 'income' && tx.isProcessed === false && !tx.isRecurringInstance)) && (
+                                <button onClick={() => handleMarkAsProcessed(tx)} title="סמן כבוצע" className="text-slate-500 hover:text-green-600 p-1.5 rounded-md hover:bg-green-100 disabled:opacity-50" disabled={markAsProcessedMutation.isLoading && markAsProcessedMutation.variables === tx}>
                                     <FiCheckSquare className="w-4 h-4"/>
                                 </button>
                             )}
@@ -620,7 +635,7 @@ const getTransactionDisplayDetails = (transaction) => {
                                 </button>
                             )}
                             {!isDeleted && (
-                                <button onClick={() => handleDelete(tx.type, tx.id)} title="מחק (ארכב)" className="text-slate-500 hover:text-red-600 p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50" disabled={deleteMutation.isLoading && deleteMutation.variables?.id === tx.id}>
+                                <button onClick={() => handleDelete(tx.type, tx.id, tx.isRecurringInstance)} title="מחק (ארכב)" className="text-slate-500 hover:text-red-600 p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50" disabled={deleteMutation.isLoading && deleteMutation.variables?.id === tx.id}>
                                     <FiTrash2 className="w-4 h-4"/>
                                 </button>
                             )}

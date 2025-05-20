@@ -68,12 +68,7 @@ const generateRecurringInstances = async (definition: RecurringExpenseDefinition
         occurrencesCount++;
 
         switch (definition.frequency) {
-            case 'daily': currentDueDate.setDate(currentDueDate.getDate() + definition.interval); break;
-            case 'weekly': currentDueDate.setDate(currentDueDate.getDate() + (7 * definition.interval)); break;
             case 'monthly': currentDueDate = addMonths(currentDueDate, definition.interval); break;
-            case 'bi-monthly': currentDueDate = addMonths(currentDueDate, 2 * definition.interval); break;
-            case 'quarterly': currentDueDate = addMonths(currentDueDate, 3 * definition.interval); break;
-            case 'semi-annually': currentDueDate = addMonths(currentDueDate, 6 * definition.interval); break;
             case 'annually': currentDueDate = addMonths(currentDueDate, 12 * definition.interval); break;
             default: throw new Error('Invalid frequency in instance generation');
         }

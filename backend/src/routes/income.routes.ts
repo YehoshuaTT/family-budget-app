@@ -278,4 +278,32 @@ router.patch(
   }
 );
 
+// --- Mark an Income as Processed ---
+// PATCH /api/incomes/:id/mark-processed
+router.patch(
+  '/:id/mark-processed',
+  authMiddleware,
+  [param('id').isInt({ gt: 0 }).withMessage('Income ID must be a positive integer')],
+  async (req: AuthenticatedRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const userId = req.user!.id;
+    const incomeId = parseInt(req.params.id, 10);
+
+    try {
+      const incomeRepository = AppDataSource.getRepository(Income);
+      const income = await incomeRepository.findOneBy({ id: incomeId, userId });
+      if (!income) return res.status(404).json({ message: 'Income not found or access denied.' });
+      if (income.isProcessed) return res.status(400).json({ message: 'Income is already marked as processed.' });
+      income.isProcessed = true;
+      await incomeRepository.save(income);
+      res.status(200).json({ message: 'Income marked as processed successfully' });
+    } catch (error: any) {
+      console.error('Error marking income as processed:', error);
+      res.status(500).json({ message: `Server error: ${error.message || 'Failed to mark income as processed'}` });
+    }
+  }
+);
+
 export default router;
