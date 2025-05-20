@@ -46,6 +46,9 @@ export class Income {
   @Column({ type: 'int', nullable: true })
   categoryId?: number | null;
 
+  @Column({ type: 'boolean', default: false, nullable: false })
+isProcessed!: boolean;
+
   @ManyToOne(() => Category, (category) => category.incomes, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'categoryId' })
   category?: Category | null;
