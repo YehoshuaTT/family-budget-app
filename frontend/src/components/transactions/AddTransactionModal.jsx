@@ -21,6 +21,7 @@ const initialDefaultFormValues = {
   categoryId: '',
   paymentMethod: '',
   expenseTypeOption: 'single',
+  incomeTypeOption: 'single', // <-- added for consistency
   rec_frequency: 'monthly',
   rec_interval: 1,
   rec_occurrences: '',
@@ -120,10 +121,11 @@ const AddTransactionModal = ({ isOpen, onClose, initialType = 'expense', transac
             rec_endDate: initialDefaultFormValues.rec_endDate,
             inst_totalAmount: initialDefaultFormValues.inst_totalAmount,
             inst_numberOfInstallments: initialDefaultFormValues.inst_numberOfInstallments,
+            incomeTypeOption: currentType === 'income' ? (transactionToEdit.expenseType || 'single') : 'single', // <-- always set
         });
     } else {
         const resetDate = format(new Date(), "yyyy-MM-dd");
-        reset({...initialDefaultFormValues, date: resetDate, expenseTypeOption: initialType === 'expense' ? 'single' : initialDefaultFormValues.expenseTypeOption, isDefiningRecurringIncome_checkbox: false});
+        reset({...initialDefaultFormValues, date: resetDate, expenseTypeOption: initialType === 'expense' ? 'single' : initialDefaultFormValues.expenseTypeOption, incomeTypeOption: 'single', isDefiningRecurringIncome_checkbox: false});
         // אם initialType הוא income, expenseTypeOption יתאפס ל-single
         // isDefiningRecurringIncome_checkbox יתאפס ל-false
     }
@@ -181,107 +183,133 @@ const onSubmit = (data) => {
         return;
     }
 
-    let payload = {
-        amount: parsedAmount, // ישמש כ-amount רגיל או סכום חזרה
-        date: format(parseISO(data.date), 'yyyy-MM-dd'), // ישמש כ-date, startDate או firstPaymentDate
-        description: data.description || null,
-    };
+    let payload = {};
     let endpoint = '';
-    let method = isEditMode ? 'put' : 'post'; // כולל isEditingDefinition
+    let method = isEditMode ? 'put' : 'post';
 
     if (transactionType === 'income') {
-        payload.categoryId = data.categoryId ? parseInt(data.categoryId, 10) : undefined;
+        // --- INCOME LOGIC ---
         const incomeTypeOption = data.incomeTypeOption || 'single';
         if (incomeTypeOption === 'recurring' && !isEditMode) {
             endpoint = '/recurring-income-definitions';
-            payload.startDate = payload.date;
-            payload.frequency = data.rec_frequency;
-            payload.interval = data.rec_interval ? parseInt(data.rec_interval, 10) : 1;
+            payload = {
+                amount: parsedAmount,
+                startDate: format(parseISO(data.date), 'yyyy-MM-dd'),
+                description: data.description || null,
+                categoryId: data.categoryId ? parseInt(data.categoryId, 10) : undefined,
+                frequency: data.rec_frequency,
+                interval: data.rec_interval ? parseInt(data.rec_interval, 10) : 1,
+            };
             if (data.rec_occurrences) payload.occurrences = parseInt(data.rec_occurrences, 10);
             if (data.rec_endDate && isValid(parseISO(data.rec_endDate))) payload.endDate = format(parseISO(data.rec_endDate), 'yyyy-MM-dd');
-            delete payload.date;
         } else if (isEditingRecurringIncomeDef && transactionToEdit) {
             endpoint = `/recurring-income-definitions/${transactionToEdit.id}`;
-            payload.startDate = payload.date;
-            payload.frequency = data.rec_frequency;
-            payload.interval = data.rec_interval ? parseInt(data.rec_interval, 10) : 1;
-            if (data.rec_occurrences !== undefined) payload.occurrences = data.rec_occurrences ? parseInt(data.rec_occurrences, 10) : null;
-            if (data.rec_endDate !== undefined) payload.endDate = data.rec_endDate && isValid(parseISO(data.rec_endDate)) ? format(parseISO(data.rec_endDate), 'yyyy-MM-dd') : null;
-            payload.isActive = transactionToEdit.isActive;
-            delete payload.date;
+            payload = {
+                amount: parsedAmount,
+                startDate: format(parseISO(data.date), 'yyyy-MM-dd'),
+                description: data.description || null,
+                categoryId: data.categoryId ? parseInt(data.categoryId, 10) : undefined,
+                frequency: data.rec_frequency,
+                interval: data.rec_interval ? parseInt(data.rec_interval, 10) : 1,
+                isActive: transactionToEdit.isActive,
+            };
+            if (data.rec_occurrences !== undefined && data.rec_occurrences !== '') payload.occurrences = parseInt(data.rec_occurrences, 10);
+            if (data.rec_endDate && isValid(parseISO(data.rec_endDate))) payload.endDate = format(parseISO(data.rec_endDate), 'yyyy-MM-dd');
         } else {
             endpoint = isEditMode ? `/incomes/${transactionToEdit.id}` : '/incomes';
+            payload = {
+                amount: parsedAmount,
+                date: format(parseISO(data.date), 'yyyy-MM-dd'),
+                description: data.description || null,
+                categoryId: data.categoryId ? parseInt(data.categoryId, 10) : undefined,
+            };
         }
-    } else { // Expense
-        payload.subcategoryId = data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined; // צריך להיות חובה להוצאה
-        if (!payload.subcategoryId && !isEditingDefinition) { // בדיקה אם זה יצירת הוצאה חדשה ללא קטגוריה
-            setFormError("יש לבחור קטגוריה להוצאה.");
-            return;
+    } else {
+        // --- EXPENSE LOGIC ---
+        const expenseType = isEditMode ? (transactionToEdit.expenseType || 'single') : data.expenseTypeOption;
+        if (!isEditMode) {
+            if (!data.subcategoryId) {
+                setFormError("יש לבחור קטגוריה להוצאה.");
+                return;
+            }
         }
-        payload.paymentMethod = data.paymentMethod || null;
-        
-        if (isEditingRecurringExpenseDef && transactionToEdit) { // עריכת הגדרת הוצאה חוזרת
-            endpoint = `/recurring-definitions/${transactionToEdit.id}`; // ודא שהנתיב נכון
-            payload.startDate = payload.date;
-            payload.frequency = data.rec_frequency;
-            payload.interval = data.rec_interval ? parseInt(data.rec_interval, 10) : 1;
-            if (data.rec_occurrences !== undefined) payload.occurrences = data.rec_occurrences ? parseInt(data.rec_occurrences, 10) : null;
-            if (data.rec_endDate !== undefined) payload.endDate = data.rec_endDate && isValid(parseISO(data.rec_endDate)) ? format(parseISO(data.rec_endDate), 'yyyy-MM-dd') : null;
-            payload.isActive = transactionToEdit.isActive;
-            delete payload.date;
-        } else if (!isEditMode) { // יצירה חדשה של הוצאה
-            payload.expenseType = data.expenseTypeOption;
-            endpoint = '/expenses'; // ה-API המאוחד שלך ליצירת הוצאות/הגדרות
-
-            if (data.expenseTypeOption === 'recurring') {
-                payload.startDate = payload.date;
-                payload.frequency = data.rec_frequency;
-                payload.interval = data.rec_interval ? parseInt(data.rec_interval, 10) : 1;
+        if (isEditingRecurringExpenseDef && transactionToEdit) {
+            endpoint = `/recurring-definitions/${transactionToEdit.id}`;
+            payload = {
+                amount: parsedAmount,
+                startDate: format(parseISO(data.date), 'yyyy-MM-dd'),
+                description: data.description || null,
+                subcategoryId: data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined,
+                paymentMethod: data.paymentMethod || null,
+                frequency: data.rec_frequency,
+                interval: data.rec_interval ? parseInt(data.rec_interval, 10) : 1,
+                isActive: transactionToEdit.isActive,
+            };
+            if (data.rec_occurrences !== undefined && data.rec_occurrences !== '') payload.occurrences = parseInt(data.rec_occurrences, 10);
+            if (data.rec_endDate && isValid(parseISO(data.rec_endDate))) payload.endDate = format(parseISO(data.rec_endDate), 'yyyy-MM-dd');
+        } else if (!isEditMode) {
+            if (expenseType === 'recurring') {
+                endpoint = '/recurring-definitions';
+                payload = {
+                    amount: parsedAmount,
+                    startDate: format(parseISO(data.date), 'yyyy-MM-dd'),
+                    description: data.description || null,
+                    subcategoryId: data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined,
+                    paymentMethod: data.paymentMethod || null,
+                    frequency: data.rec_frequency,
+                    interval: data.rec_interval ? parseInt(data.rec_interval, 10) : 1,
+                };
                 if (data.rec_occurrences) payload.occurrences = parseInt(data.rec_occurrences, 10);
                 if (data.rec_endDate && isValid(parseISO(data.rec_endDate))) payload.endDate = format(parseISO(data.rec_endDate), 'yyyy-MM-dd');
-                delete payload.date; 
-            } else if (data.expenseTypeOption === 'installment') {
-                // amount הופך ל-totalAmount
-                payload.totalAmount = payload.amount; 
-                payload.numberOfInstallments = data.inst_numberOfInstallments ? parseInt(data.inst_numberOfInstallments, 10) : undefined;
-                payload.firstPaymentDate = payload.date;
-                if (!payload.totalAmount || payload.totalAmount <= 0) {setFormError("סכום עסקה כולל חסר או לא תקין."); return;}
-                if (!payload.numberOfInstallments || payload.numberOfInstallments < 2) {setFormError("מספר תשלומים חסר או לא תקין."); return;}
-                delete payload.amount; 
-                delete payload.date;
-            } else { // single
-                 payload.isProcessed = true;
+            } else if (expenseType === 'installment') {
+                endpoint = '/installment-transactions';
+                const totalAmount = parseFloat(data.inst_totalAmount);
+                const numberOfInstallments = data.inst_numberOfInstallments ? parseInt(data.inst_numberOfInstallments, 10) : undefined;
+                if (!totalAmount || totalAmount <= 0) { setFormError("סכום עסקה כולל חסר או לא תקין."); return; }
+                if (!numberOfInstallments || numberOfInstallments < 2) { setFormError("מספר תשלומים חסר או לא תקין."); return; }
+                payload = {
+                    totalAmount,
+                    numberOfInstallments,
+                    firstPaymentDate: format(parseISO(data.date), 'yyyy-MM-dd'),
+                    description: data.description || null,
+                    subcategoryId: data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined,
+                    paymentMethod: data.paymentMethod || null,
+                };
+            } else {
+                endpoint = '/expenses';
+                payload = {
+                    amount: parsedAmount,
+                    date: format(parseISO(data.date), 'yyyy-MM-dd'),
+                    description: data.description || null,
+                    subcategoryId: data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined,
+                    paymentMethod: data.paymentMethod || null,
+                    isProcessed: true,
+                    expenseType: 'single', // <-- required for backend
+                };
             }
-        } else { // עריכת מופע הוצאה קיים
-            payload.isProcessed = data.isProcessed !== undefined ? data.isProcessed : (transactionToEdit?.isProcessed || false);
-            payload.expenseType = transactionToEdit.expenseType; 
-            if(transactionToEdit.parentId) payload.parentId = transactionToEdit.parentId;
+        } else {
+            // Edit mode for single/instance expense
             endpoint = `/expenses/${transactionToEdit.id}`;
-        }
-    }
-    
-    // בדיקה אחרונה לפני שליחה
-    if ((endpoint.includes('recurring') || endpoint.includes('installment')) && (payload.amount === undefined && payload.totalAmount === undefined)) {
-        // אם יוצרים הגדרה, ואין amount (להגדרה חוזרת) או totalAmount (לתשלומים)
-        // וה-amount הכללי הוא NaN (למשל, אם שדה הסכום הראשי היה ריק)
-        if (isNaN(parsedAmount)) {
-            setFormError("סכום חסר עבור הגדרה חוזרת או תשלומים.");
-            return;
-        }
-        // אם זה הגדרת תשלומים, amount המקורי נמחק, אז אין טעם להשתמש בו
-        if (!endpoint.includes('installment')) {
-             payload.amount = parsedAmount; // ודא ש-amount קיים להגדרות חוזרות
+            payload = {
+                amount: parsedAmount,
+                date: format(parseISO(data.date), 'yyyy-MM-dd'),
+                description: data.description || null,
+                subcategoryId: data.subcategoryId ? parseInt(data.subcategoryId, 10) : undefined,
+                paymentMethod: data.paymentMethod || null,
+                isProcessed: data.isProcessed !== undefined ? data.isProcessed : (transactionToEdit?.isProcessed || false),
+                expenseType: transactionToEdit.expenseType,
+            };
+            if(transactionToEdit.parentId) payload.parentId = transactionToEdit.parentId;
         }
     }
 
-
-    console.log('Submitting to endpoint:', endpoint, 'with payload:', payload);
+    // Final validation for required fields
     if (!endpoint) {
         setFormError("לא ניתן לקבוע את נקודת הקצה לשליחה. בדוק את סוג הפעולה.");
         return;
     }
     mutation.mutate({ method, endpoint, payload });
-  };
+};
   const onCloseAndReset = useCallback(() => { // עטפתי ב-useCallback
     const resetDate = format(new Date(), "yyyy-MM-dd");
     reset({...initialDefaultFormValues, date: resetDate});
@@ -390,13 +418,13 @@ const onSubmit = (data) => {
             <button type="button" onClick={() => { 
                 setTransactionType('expense'); 
                 clearErrors(); 
-                reset({ ...initialDefaultFormValues, date: format(new Date(), 'yyyy-MM-dd'), expenseTypeOption: 'single', isDefiningRecurringIncome_checkbox: false }); 
+                reset({ ...initialDefaultFormValues, date: format(new Date(), 'yyyy-MM-dd'), expenseTypeOption: 'single', incomeTypeOption: 'single', isDefiningRecurringIncome_checkbox: false }); 
             }}
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${transactionType === 'expense' ? 'bg-red-500 text-white shadow-md' : 'text-slate-600 hover:bg-red-100'}`}>הוצאה</button>
             <button type="button" onClick={() => { 
                 setTransactionType('income'); 
                 clearErrors(); 
-                reset({ ...initialDefaultFormValues, date: format(new Date(), 'yyyy-MM-dd'), expenseTypeOption: 'single', isDefiningRecurringIncome_checkbox: false }); 
+                reset({ ...initialDefaultFormValues, date: format(new Date(), 'yyyy-MM-dd'), expenseTypeOption: 'single', incomeTypeOption: 'single', isDefiningRecurringIncome_checkbox: false }); 
             }}
                 className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${transactionType === 'income' ? 'bg-green-500 text-white shadow-md' : 'text-slate-600 hover:bg-green-100'}`}>הכנסה</button>
             </div>
