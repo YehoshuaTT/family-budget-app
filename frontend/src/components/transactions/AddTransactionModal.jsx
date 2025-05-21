@@ -67,8 +67,8 @@ const AddTransactionModal = ({ isOpen, onClose, initialType = 'expense', transac
   // useEffect לאכלוס הטופס במצב עריכה או איפוס
   useEffect(() => {
     setTransactionType(initialType);
+    // הגנה: categories עלול להיות undefined בסיבוב הראשון
     if (isEditingRecurringIncomeDef && transactionToEdit) {
-      // עריכת הגדרה של הכנסה חוזרת
       reset({
         amount: transactionToEdit.amount,
         date: transactionToEdit.date || initialDefaultFormValues.date,
@@ -79,10 +79,19 @@ const AddTransactionModal = ({ isOpen, onClose, initialType = 'expense', transac
         rec_occurrences: transactionToEdit.occurrences || '',
         rec_endDate: transactionToEdit.endDate || '',
         isDefiningRecurringIncome_checkbox: true,
+        incomeTypeOption: 'recurring',
       });
+      if (categories) {
+        setCategorySearch(
+          (categories.find(cat => cat.id === Number(transactionToEdit.categoryId))?.name_he ||
+            categories.find(cat => cat.id === Number(transactionToEdit.categoryId))?.name ||
+            '')
+        );
+      } else {
+        setCategorySearch('');
+      }
       setTransactionType('income');
     } else if (isEditingRecurringExpenseDef && transactionToEdit) {
-      // עריכת הגדרה של הוצאה חוזרת
       reset({
         amount: transactionToEdit.amount,
         date: transactionToEdit.date || initialDefaultFormValues.date,
@@ -97,40 +106,39 @@ const AddTransactionModal = ({ isOpen, onClose, initialType = 'expense', transac
       });
       setTransactionType('expense');
     } else if (isEditMode && transactionToEdit) {
-        const currentType = transactionToEdit.type || transactionToEdit.transactionType || 'expense';
-        setTransactionType(currentType);
-        
-        const subId = transactionToEdit.subcategory?.id || transactionToEdit.subcategoryId || '';
-        const catId = transactionToEdit.category?.id || transactionToEdit.categoryId || '';
-
-        // אכלוס ראשוני
-        reset({ // שימוש ב-reset לאכלוס ראשוני במצב עריכה
-            amount: transactionToEdit.amount,
-            date: transactionToEdit.date ? format(parseISO(transactionToEdit.date), 'yyyy-MM-dd') : initialDefaultFormValues.date,
-            description: transactionToEdit.description || '',
-            subcategoryId: currentType === 'expense' ? subId : '',
-            categoryId: currentType === 'income' ? catId : '',
-            paymentMethod: transactionToEdit.paymentMethod || '',
-            expenseTypeOption: transactionToEdit.expenseType || 'single',
-            isProcessed: transactionToEdit.isProcessed !== undefined ? transactionToEdit.isProcessed : false,
-            isDefiningRecurringIncome_checkbox: false, // לא מגדירים חדש בעריכה
-            // אפס שדות של recurring/installment לערכי ברירת מחדל
-            rec_frequency: initialDefaultFormValues.rec_frequency,
-            rec_interval: initialDefaultFormValues.rec_interval,
-            rec_occurrences: initialDefaultFormValues.rec_occurrences,
-            rec_endDate: initialDefaultFormValues.rec_endDate,
-            inst_totalAmount: initialDefaultFormValues.inst_totalAmount,
-            inst_numberOfInstallments: initialDefaultFormValues.inst_numberOfInstallments,
-            incomeTypeOption: currentType === 'income' ? (transactionToEdit.expenseType || 'single') : 'single', // <-- always set
-        });
+      const currentType = transactionToEdit.type || transactionToEdit.transactionType || 'expense';
+      setTransactionType(currentType);
+      const subId = transactionToEdit.subcategory?.id || transactionToEdit.subcategoryId || '';
+      const catId = transactionToEdit.category?.id || transactionToEdit.categoryId || '';
+      reset({
+        amount: transactionToEdit.amount,
+        date: transactionToEdit.date ? format(parseISO(transactionToEdit.date), 'yyyy-MM-dd') : initialDefaultFormValues.date,
+        description: transactionToEdit.description || '',
+        subcategoryId: currentType === 'expense' ? subId : '',
+        categoryId: currentType === 'income' ? catId : '',
+        paymentMethod: transactionToEdit.paymentMethod || '',
+        expenseTypeOption: transactionToEdit.expenseType || 'single',
+        incomeTypeOption: transactionToEdit.incomeTypeOption || 'single',
+        isProcessed: transactionToEdit.isProcessed,
+      });
+      if (currentType === 'income') {
+        if (categories) {
+          setCategorySearch(
+            (categories.find(cat => cat.id === Number(catId))?.name_he ||
+              categories.find(cat => cat.id === Number(catId))?.name ||
+              '')
+          );
+        } else {
+          setCategorySearch('');
+        }
+      }
     } else {
-        const resetDate = format(new Date(), "yyyy-MM-dd");
-        reset({...initialDefaultFormValues, date: resetDate, expenseTypeOption: initialType === 'expense' ? 'single' : initialDefaultFormValues.expenseTypeOption, incomeTypeOption: 'single', isDefiningRecurringIncome_checkbox: false});
-        // אם initialType הוא income, expenseTypeOption יתאפס ל-single
-        // isDefiningRecurringIncome_checkbox יתאפס ל-false
+      reset(initialDefaultFormValues);
+      setCategorySearch('');
+      setSubcategorySearch('');
     }
-  }, [transactionToEdit, isEditMode, reset, initialType]); // הסרתי setValue
-
+    // eslint-disable-next-line
+  }, [isOpen, transactionToEdit, categories]);
 
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories', transactionType],

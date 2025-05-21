@@ -8,6 +8,7 @@ import { Category } from '../entity/Category';
 import authMiddleware, { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { format, parseISO, isValid as isValidDate, addMonths, addDays, addWeeks, addYears } from 'date-fns';
 import { IsNull } from 'typeorm';
+import { deleteAllRecurringInstancesAndParent } from '../services/recurringIncome.service';
 // In ו- IsNull לא נצטרך ישירות כאן אם QueryBuilder מטפל בזה נכון
 // import { In, IsNull } from 'typeorm'; 
 
@@ -263,6 +264,22 @@ router.patch('/:id/restore', authMiddleware, [param('id').isInt({gt: 0}).withMes
     } catch (error:any) { 
         console.error("Error restoring recurring income definition:", error);
         res.status(500).json({ message: error.message || "Failed to restore recurring income definition"});
+    }
+});
+
+// --- Enhanced: Delete recurring income definition and all children ---
+// DELETE /api/recurring-income-definitions/:id/with-children
+router.delete('/:id/with-children', authMiddleware, [param('id').isInt({gt: 0}).withMessage('ID must be a positive integer.').toInt()], async (req: AuthenticatedRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array()});
+    const id = req.params.id as unknown as number;
+    const userId = req.user!.id;
+    try {
+        await deleteAllRecurringInstancesAndParent({ parentId: id, userId });
+        res.status(200).json({message: "Recurring income definition and all children soft deleted"});
+    } catch (error:any) {
+        console.error("Error soft-deleting recurring income definition and children:", error);
+        res.status(500).json({ message: error.message || "Failed to soft-delete recurring income definition and children"});
     }
 });
 

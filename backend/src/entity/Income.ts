@@ -49,6 +49,9 @@ export class Income {
   @Column({ type: 'boolean', default: false, nullable: false })
 isProcessed!: boolean;
 
+  @Column({ type: 'integer', nullable: true }) // FK to either RecurringExpenseDefinition or InstallmentTransaction
+  parentId?: number | null;
+
   @ManyToOne(() => Category, (category) => category.incomes, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'categoryId' })
   category?: Category | null;

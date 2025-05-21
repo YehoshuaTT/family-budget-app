@@ -10,6 +10,7 @@ import {
 } from 'react-icons/fi';
 import AddTransactionModal from '../components/transactions/AddTransactionModal'; // ודא שהנתיב נכון
 import { useAuth } from '../contexts/AuthContext'; // אם תרצה לגשת ל-user settings דרכו
+import Modal from 'react-modal'; // ודא שיש לך את הספריה, או תחליף בפתרון modal אחר
 
 // Helper function to format currency
 const formatCurrency = (amount, currency = '₪') => {
@@ -29,33 +30,91 @@ const SkeletonRow = () => (
 );
 
 // Function to fetch ALL transactions (client-side filtering/pagination for now)
-const fetchAllTransactions = async () => {
-  // במצב אידיאלי, ה-API יקבל את כל פרמטרי הסינון, המיון והדפדוף
+const fetchAllTransactions = async (dateRange) => {
   const [incomesRes, expensesRes, recurringIncomeDefsRes] = await Promise.all([
-    apiClient.get('/incomes'), // שלוף את כל ההכנסות
-    apiClient.get('/expenses'),  // שלוף את כל ההוצאות
-    apiClient.get('/recurring-income-definitions') // שלוף את כל ההגדרות של הכנסה חוזרת
+    apiClient.get('/incomes'),
+    apiClient.get('/expenses'),
+    apiClient.get('/recurring-income-definitions')
   ]);
 
   const incomes = incomesRes.data.map(inc => ({ ...inc, type: 'income', transactionDate: inc.date, isExpense: false }));
   const expenses = expensesRes.data.map(exp => ({ ...exp, type: 'expense', transactionDate: exp.date, isExpense: true }));
 
-  // הוסף את ההגדרות של הכנסה חוזרת כפעולות מתוכננות
-  const recurringIncomeDefs = (recurringIncomeDefsRes.data || []).map(def => ({
-    ...def,
-    id: def.id,
-    type: 'income',
-    isRecurringInstance: true,
-    isProcessed: false, // הגדרה מתוכננת, לא בוצעה
-    transactionDate: def.nextDueDate || def.startDate, // תאריך הבא או תאריך התחלה
-    date: def.nextDueDate || def.startDate,
-    description: (def.description || '') + ' (מתוכנן)',
-    categoryId: def.categoryId,
-    category: def.category,
-    // אפשר להוסיף שדות נוספים במידת הצורך
-  }));
+  // Build a lookup: { [parentId]: Set of YYYY-MM-DD strings }
+  const realRecurringIncomeMap = {};
+  incomes.forEach(inc => {
+    if (inc.parentId && inc.date) {
+      const key = `${Number(inc.parentId)}-${format(parseISO(inc.date), 'yyyy-MM-dd')}`;
+      realRecurringIncomeMap[key] = true;
+    }
+  });
 
-  let allTransactions = [...incomes, ...expenses, ...recurringIncomeDefs];
+  const recurringIncomeDefs = (recurringIncomeDefsRes.data || []);
+  let plannedRecurringInstances = [];
+  const from = dateRange?.from ? startOfMonth(dateRange.from) : null;
+  const to = dateRange?.to ? endOfMonth(dateRange.to) : null;
+
+  recurringIncomeDefs.forEach(def => {
+    if (!def.isActive) return;
+    let current = parseISO(def.startDate);
+    const freq = def.frequency || 'monthly';
+    const interval = def.interval || 1;
+    let count = 0;
+    let maxOccurrences = def.occurrences || 120;
+    let endDate = def.endDate ? parseISO(def.endDate) : null;
+    // advance to first relevant date
+    while (from && current < from) {
+      if (freq === 'monthly') {
+        current = addMonths(current, interval);
+      } else if (freq === 'yearly') {
+        current = addMonths(current, 12 * interval);
+      } else {
+        break;
+      }
+      count++;
+      if (def.occurrences && count >= def.occurrences) break;
+      if (endDate && current > endDate) break;
+    }
+    // generate for each period in range
+    while (
+      (!to || current <= to) &&
+      (!endDate || current <= endDate) &&
+      (!def.occurrences || count < def.occurrences)
+    ) {
+      // Use parentId+date as the key for duplicate prevention
+      const plannedKey = `${Number(def.id)}-${format(current, 'yyyy-MM-dd')}`;
+      // Check for real income with parentId for this date
+      const hasRealInstance = realRecurringIncomeMap[plannedKey];
+      if (!hasRealInstance) {
+        plannedRecurringInstances.push({
+          ...def,
+          id: `${def.id}-planned-${format(current, 'yyyy-MM-dd')}`,
+          type: 'income',
+          isRecurringInstance: true,
+          isProcessed: false,
+          transactionDate: format(current, 'yyyy-MM-dd'),
+          date: format(current, 'yyyy-MM-dd'),
+          description: (def.description || '') + ' (מתוכנן)',
+          categoryId: def.categoryId,
+          category: def.category,
+          recurringDefinitionId: def.id,
+          parentId: Number(def.id), // always number for robust comparison
+          plannedInstanceDate: format(current, 'yyyy-MM-dd'),
+        });
+      }
+      // advance
+      if (freq === 'monthly') {
+        current = addMonths(current, interval);
+      } else if (freq === 'yearly') {
+        current = addMonths(current, 12 * interval);
+      } else {
+        break;
+      }
+      count++;
+    }
+  });
+
+  let allTransactions = [...incomes, ...expenses, ...plannedRecurringInstances];
   // מיון ברירת מחדל (יישאר גם אם המיון הדינמי יחליף אותו מאוחר יותר)
   allTransactions.sort((a, b) => parseISO(b.transactionDate).getTime() - parseISO(a.transactionDate).getTime() || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return allTransactions;
@@ -69,6 +128,19 @@ const restoreMutationFn = async ({ type, id }) => {
 // --- End Helper Functions ---
 
 const markAsProcessedMutationFn = async (transaction) => {
+    // If this is a planned recurring income instance, create a real income
+    if (transaction.isRecurringInstance && transaction.type === 'income') {
+        // Build the payload for the new income
+        const payload = {
+            amount: transaction.amount,
+            description: transaction.description?.replace(' (מתוכנן)', '') || '',
+            date: transaction.plannedInstanceDate || transaction.date,
+            categoryId: transaction.categoryId,
+            // אפשר להוסיף שדות נוספים במידת הצורך
+            recurringDefinitionId: transaction.recurringDefinitionId || transaction.id
+        };
+        return apiClient.post('/incomes', payload);
+    }
     if (transaction.type === 'income') {
         return apiClient.patch(`/incomes/${transaction.id}/mark-processed`);
     } else {
@@ -82,6 +154,9 @@ function TransactionsListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [initialModalType, setInitialModalType] = useState('expense');
+  const [showRecurringActionModal, setShowRecurringActionModal] = useState(false);
+  const [recurringActionType, setRecurringActionType] = useState(null); // 'delete' | 'edit'
+  const [recurringActionTarget, setRecurringActionTarget] = useState(null); // transaction object
   
   // Filter states
   const [filterType, setFilterType] = useState('all'); // 'all', 'income', 'expense'
@@ -102,8 +177,8 @@ function TransactionsListPage() {
 
   // Query for ALL transactions (will be filtered/paginated client-side)
   const { data: rawTransactions, isLoading, error, refetch } = useQuery({
-    queryKey: ['allTransactions'], // מפתח קבוע כי שולפים הכל
-    queryFn: fetchAllTransactions,
+    queryKey: ['allTransactions', dateRange.from?.toISOString(), dateRange.to?.toISOString()],
+    queryFn: () => fetchAllTransactions(dateRange),
   });
 
   // Query for categories (for filter dropdown)
@@ -234,10 +309,11 @@ const { data: periodSummary, isLoading: isLoadingSummary, error: periodSummaryEr
 
 
   const deleteMutation = useMutation({
-    mutationFn: ({ type, id, isRecurringInstance }) => {
-      // אם זו recurring income definition, שלח ל-endpoint המתאים
+    mutationFn: ({ type, id, isRecurringInstance, recurringDefinitionId }) => {
+      // אם זו recurring income definition, שלח ל-endpoint המתאים עם מזהה מספרי בלבד
       if (type === 'income' && isRecurringInstance) {
-        return apiClient.delete(`/recurring-income-definitions/${id}`);
+        const defId = recurringDefinitionId || (typeof id === 'string' && id.split('-')[0]) || id;
+        return apiClient.delete(`/recurring-income-definitions/${defId}`);
       }
       const endpoint = type === 'income' ? `/incomes/${id}` : `/expenses/${id}`;
       return apiClient.delete(endpoint);
@@ -268,10 +344,18 @@ const { data: periodSummary, isLoading: isLoadingSummary, error: periodSummaryEr
       }
   });
 
+  // סימון כבוצע: מניעת כפילות הכנסה מתוכננת
+  // כאשר מסמנים מופע הכנסה חוזרת כבוצע, יש לרענן את כל הרשימה (invalidateQueries) כדי שההכנסה המתוכננת תיעלם
+  // וגם לא להציג פעמיים הכנסה לאותו תאריך/parentId
+  // (ה-backend כבר מונע כפילות, אך נוודא שה-front לא יוצר פעמיים)
+  // ב-fetchAllTransactions כבר יש מנגנון realRecurringIncomeMap שמונע כפילות, לכן אין צורך לשנות שם
+  // נוודא invalidateQueries מלא אחרי סימון כבוצע
   const markAsProcessedMutation = useMutation({
     mutationFn: markAsProcessedMutationFn,
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['allTransactions'] });
+        queryClient.invalidateQueries({ queryKey: ['incomes'] });
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
         ['dashboardSummary', 'recentTransactions', 'expenseDistribution'].forEach(key => 
           queryClient.invalidateQueries({ queryKey: [key], exact: false })
         );
@@ -281,30 +365,52 @@ const { data: periodSummary, isLoading: isLoadingSummary, error: periodSummaryEr
     }
   });
 
-  const handleDelete = (type, id, isRecurringInstance) => {
-    if (window.confirm(`האם אתה בטוח שברצונך למחוק (לארכב) ${type === 'income' ? 'הכנסה' : 'הוצאה'} זו?`)) {
-      deleteMutation.mutate({ type, id, isRecurringInstance });
-    }
-  };
-  
-  const handleRestore = (type, id) => {
-    if (window.confirm(`האם אתה בטוח שברצונך לשחזר ${type === 'income' ? 'הכנסה' : 'הוצאה'} זו?`)) {
-        restoreMutation.mutate({ type, id });
-    }
-  };
-  
-  const handleMarkAsProcessed = (transaction) => {
-    if (window.confirm(`האם אתה בטוח שברצונך לסמן ${transaction.type === 'income' ? 'הכנסה' : 'הוצאה'} זו כבוצעה?`)) {
-        markAsProcessedMutation.mutate(transaction);
+  const handleDelete = (type, id, isRecurringInstance, recurringDefinitionId, txObj) => {
+    if (isRecurringInstance && type === 'income') {
+      setRecurringActionType('delete');
+      setRecurringActionTarget({ type, id, recurringDefinitionId, txObj });
+      setShowRecurringActionModal(true);
+    } else {
+      if (window.confirm(`האם אתה בטוח שברצונך למחוק (לארכב) ${type === 'income' ? 'הכנסה' : 'הוצאה'} זו?`)) {
+        deleteMutation.mutate({ type, id, isRecurringInstance, recurringDefinitionId });
+      }
     }
   };
 
+  // --- עריכה חכמה ---
   const openEditModal = (transaction) => {
+    if (transaction.isRecurringInstance && transaction.type === 'income') {
+      setRecurringActionType('edit');
+      setRecurringActionTarget(transaction);
+      setShowRecurringActionModal(true);
+    } else {
       setInitialModalType(transaction.type || (transaction.isExpense ? 'expense' : 'income'));
       setEditingTransaction(transaction);
       setIsModalOpen(true);
+    }
   };
-  
+
+  // --- ביצוע פעולה חכמה (מחיקה/עריכה) ---
+  const handleRecurringAction = async (action) => {
+    setShowRecurringActionModal(false);
+    if (!recurringActionTarget) return;
+    const { type, id, recurringDefinitionId, txObj } = recurringActionTarget;
+    if (recurringActionType === 'delete') {
+      if (action === 'all') {
+        await deleteMutation.mutateAsync({ type, id: recurringDefinitionId, isRecurringInstance: true, recurringDefinitionId });
+      } else if (action === 'single') {
+        await deleteMutation.mutateAsync({ type, id, isRecurringInstance: false });
+        // כאן אפשר להוסיף קריאה ל-backend לעדכן occurrences/תאריכים של ההגדרה
+      }
+    } else if (recurringActionType === 'edit') {
+      setInitialModalType('income');
+      setEditingTransaction({ ...recurringActionTarget, editAllRecurring: action === 'all' });
+      setIsModalOpen(true);
+    }
+    setRecurringActionTarget(null);
+    setRecurringActionType(null);
+  };
+
   const openAddModal = (type = 'expense') => {
     setEditingTransaction(null);
     setInitialModalType(type);
@@ -370,6 +476,11 @@ const getTransactionDisplayDetails = (transaction) => {
     );
   };
 
+
+  // --- סימון פעולה כבוצע (כולל מופע הכנסה חוזרת מתוכננת) ---
+  const handleMarkAsProcessed = (transaction) => {
+    markAsProcessedMutation.mutate(transaction);
+  };
 
   if (error) return ( <div className="flex flex-col items-center justify-center h-64 text-red-600 bg-red-50 p-4 rounded-md"><FiAlertTriangle className="h-12 w-12 mb-4"/><p className="text-xl font-semibold">שגיאה בטעינת הפעולות</p><p>{error.message || "לא ניתן היה לטעון את הנתונים."}</p><button onClick={() => refetch()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">נסה שוב</button></div>);
   if (isLoading && !rawTransactions) return ( // הצג טעינה ראשונית אם אין נתונים בכלל
@@ -555,6 +666,23 @@ const getTransactionDisplayDetails = (transaction) => {
         </div>
       </div>
       
+      {/* Modal למחיקה/עריכה של הכנסה חוזרת */}
+      <Modal
+        isOpen={showRecurringActionModal}
+        onRequestClose={() => setShowRecurringActionModal(false)}
+        contentLabel="פעולה על הכנסה חוזרת"
+        ariaHideApp={false}
+        style={{ content: { maxWidth: 400, margin: 'auto', textAlign: 'center' } }}
+      >
+        <h2 className="text-lg font-bold mb-4">{recurringActionType === 'delete' ? 'מחיקת הכנסה חוזרת' : 'עריכת הכנסה חוזרת'}</h2>
+        <p className="mb-4">האם ברצונך {recurringActionType === 'delete' ? 'למחוק' : 'לערוך'} את כל המופעים של ההכנסה החוזרת, או רק את המופע הנוכחי?</p>
+        <div className="flex gap-2 justify-center">
+          <button className="px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700" onClick={() => handleRecurringAction('all')}>את כל המופעים</button>
+          <button className="px-4 py-2 bg-slate-200 text-slate-800 rounded hover:bg-slate-300" onClick={() => handleRecurringAction('single')}>רק את הנוכחית</button>
+          <button className="px-4 py-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200" onClick={() => setShowRecurringActionModal(false)}>ביטול</button>
+        </div>
+      </Modal>
+
       <div className="bg-white shadow-xl rounded-xl overflow-x-auto">
         <table className="min-w-full leading-normal">
           <thead>
@@ -624,7 +752,7 @@ const getTransactionDisplayDetails = (transaction) => {
                     </td>
                     <td className="px-5 py-3 border-b border-slate-200">
                         <div className="flex items-center justify-center space-x-1 space-x-reverse">
-                            {!isDeleted && ((tx.isExpense && tx.isProcessed === false) || (tx.type === 'income' && tx.isProcessed === false && !tx.isRecurringInstance)) && (
+                            {!isDeleted && ((tx.isExpense && tx.isProcessed === false) || (tx.type === 'income' && tx.isProcessed === false && (!tx.isRecurringInstance || tx.isRecurringInstance))) && (
                                 <button onClick={() => handleMarkAsProcessed(tx)} title="סמן כבוצע" className="text-slate-500 hover:text-green-600 p-1.5 rounded-md hover:bg-green-100 disabled:opacity-50" disabled={markAsProcessedMutation.isLoading && markAsProcessedMutation.variables === tx}>
                                     <FiCheckSquare className="w-4 h-4"/>
                                 </button>
@@ -635,7 +763,7 @@ const getTransactionDisplayDetails = (transaction) => {
                                 </button>
                             )}
                             {!isDeleted && (
-                                <button onClick={() => handleDelete(tx.type, tx.id, tx.isRecurringInstance)} title="מחק (ארכב)" className="text-slate-500 hover:text-red-600 p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50" disabled={deleteMutation.isLoading && deleteMutation.variables?.id === tx.id}>
+                                <button onClick={() => handleDelete(tx.type, tx.id, tx.isRecurringInstance, tx.recurringDefinitionId, tx)} title="מחק (ארכב)" className="text-slate-500 hover:text-red-600 p-1.5 rounded-md hover:bg-red-100 disabled:opacity-50" disabled={deleteMutation.isLoading && deleteMutation.variables?.id === tx.id}>
                                     <FiTrash2 className="w-4 h-4"/>
                                 </button>
                             )}
